@@ -5,14 +5,10 @@
   "type": "module",
   "private": true,
   "license": "MIT",
-  "bin": {
-    "b24": "./dist/cli.js"
-  },
   "engines": {
     "node": ">=20.19"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json",
     "build:skill": "esbuild src/cli.ts --bundle --platform=node --target=node20 --format=cjs --outfile=skills/bitrix24-workspace/scripts/b24.cjs",
     "pack:skill": "npm run build:skill && python3 scripts/pack-skill.py",
     "test": "vitest run",
