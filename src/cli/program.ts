@@ -8,8 +8,10 @@
 import { Command, CommanderError } from 'commander';
 import { AppError } from '../api/errors.js';
 import { APP_VERSION, CLI_NAME } from '../config/config.js';
+import { registerCalendarMeetings } from './register-calendar-meetings.js';
 import { registerChats } from './register-chats.js';
 import { registerDisk } from './register-disk.js';
+import { registerMail } from './register-mail.js';
 import { registerProjectsTasks } from './register-projects-tasks.js';
 import { registerStatusUsers } from './register-status-users.js';
 import { runCommand, type Runner } from './runtime.js';
@@ -29,6 +31,8 @@ export function buildProgram(run: Runner = runCommand): Command {
   registerChats(program, run);
   registerProjectsTasks(program, run);
   registerDisk(program, run);
+  registerMail(program, run);
+  registerCalendarMeetings(program, run);
   return program;
 }
 
