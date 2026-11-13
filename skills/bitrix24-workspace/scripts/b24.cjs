@@ -10976,22 +10976,11 @@ function unexpected2(field) {
     details: { field }
   });
 }
-
-// src/commands/calendar.ts
 var USER_GET_PAGE = 50;
-var MAX_ATTENDEE_LOOKUP = 200;
-var RESPONSES = { Y: "\u043F\u0440\u0438\u043D\u044F\u043B", N: "\u043E\u0442\u043A\u043B\u043E\u043D\u0438\u043B", Q: "\u043D\u0435 \u043E\u0442\u0432\u0435\u0442\u0438\u043B", H: "\u043E\u0440\u0433\u0430\u043D\u0438\u0437\u0430\u0442\u043E\u0440" };
-function invalid2(message) {
-  return new AppError({ code: "APP_CLI_INVALID_ARGUMENT", userMessage: message });
-}
-function isRecurring(rrule) {
-  return isObject2(rrule) ? Object.keys(rrule).length > 0 : str(rrule).trim() !== "";
-}
-async function attendeeNames(ctx, events) {
-  const ids = [...new Set(events.flatMap((e) => asArray(e.ATTENDEE_LIST).filter(isObject2).map((a) => num(a.id))).filter((id) => id !== null))];
+var MAX_NAME_LOOKUP = 200;
+async function lookupNames(ctx, ids) {
+  const wanted = [...new Set(ids)].filter((id) => id > 0).slice(0, MAX_NAME_LOOKUP);
   const names = /* @__PURE__ */ new Map();
-  if (ids.length === 0) return names;
-  const wanted = ids.slice(0, MAX_ATTENDEE_LOOKUP);
   for (let i = 0; i < wanted.length; i += USER_GET_PAGE) {
     const resp = await ctx.client.call("user.get", { filter: { ID: wanted.slice(i, i + USER_GET_PAGE) } });
     for (const u of asArray(resp.result).filter(isObject2)) {
@@ -11000,6 +10989,24 @@ async function attendeeNames(ctx, events) {
     }
   }
   return names;
+}
+function nameOf(names, id) {
+  return names.get(id) ?? `\u0441\u043E\u0442\u0440\u0443\u0434\u043D\u0438\u043A ${id}`;
+}
+
+// src/commands/calendar.ts
+var RESPONSES = { Y: "\u043F\u0440\u0438\u043D\u044F\u043B", N: "\u043E\u0442\u043A\u043B\u043E\u043D\u0438\u043B", Q: "\u043D\u0435 \u043E\u0442\u0432\u0435\u0442\u0438\u043B", H: "\u043E\u0440\u0433\u0430\u043D\u0438\u0437\u0430\u0442\u043E\u0440" };
+function invalid2(message) {
+  return new AppError({ code: "APP_CLI_INVALID_ARGUMENT", userMessage: message });
+}
+function isRecurring(rrule) {
+  return isObject2(rrule) ? Object.keys(rrule).length > 0 : str(rrule).trim() !== "";
+}
+function attendeeNames(ctx, events) {
+  return lookupNames(
+    ctx,
+    events.flatMap((e) => asArray(e.ATTENDEE_LIST).filter(isObject2).map((a) => num(a.id))).filter((id) => id !== null)
+  );
 }
 function toEvent(e, names) {
   return {
@@ -11014,7 +11021,7 @@ function toEvent(e, names) {
     myResponse: RESPONSES[str(e.MEETING_STATUS)] ?? null,
     attendees: asArray(e.ATTENDEE_LIST).filter(isObject2).map((a) => {
       const id = num(a.id) ?? 0;
-      return { id, name: names.get(id) ?? `\u0441\u043E\u0442\u0440\u0443\u0434\u043D\u0438\u043A ${id}`, response: RESPONSES[str(a.status)] ?? str(a.status) };
+      return { id, name: nameOf(names, id), response: RESPONSES[str(a.status)] ?? str(a.status) };
     })
   };
 }
@@ -11107,8 +11114,8 @@ async function meetingsGet(ctx, idRaw, opts) {
   const select = ["callId", "startDate", "endDate", "durationSeconds", "participants", "overview", "summary", ...opts.transcript ? ["transcription"] : []];
   const resp = await ctx.client.callV3("call.followup.get", { callId, select });
   const item = isObject2(resp.item) ? resp.item : resp;
-  const people = participants(item);
-  if (!people.some((p) => p.id === ctx.webhook.userId)) {
+  const people2 = participants(item);
+  if (!people2.some((p) => p.id === ctx.webhook.userId)) {
     throw new AppError({
       code: "APP_B24_ACCESS_DENIED",
       userMessage: "\u041D\u0435\u0442 \u0434\u043E\u0441\u0442\u0443\u043F\u0430: \u0432\u044B \u043D\u0435 \u0443\u0447\u0430\u0441\u0442\u043D\u0438\u043A \u044D\u0442\u043E\u0439 \u0432\u0441\u0442\u0440\u0435\u0447\u0438. \u0421\u043A\u0438\u043B\u043B \u043F\u043E\u043A\u0430\u0437\u044B\u0432\u0430\u0435\u0442 \u0438\u0442\u043E\u0433\u0438 \u0442\u043E\u043B\u044C\u043A\u043E \u0432\u0441\u0442\u0440\u0435\u0447 \u0441 \u0432\u0430\u0448\u0438\u043C \u0443\u0447\u0430\u0441\u0442\u0438\u0435\u043C."
@@ -11120,7 +11127,7 @@ async function meetingsGet(ctx, idRaw, opts) {
     start: str(item.startDate),
     end: str(item.endDate),
     durationSeconds: num(item.durationSeconds),
-    participants: people,
+    participants: people2,
     topic: str(overview.topic),
     meetingType: clean(overview.meetingType, ctx.tz),
     agenda: clean(overview.agenda, ctx.tz),
@@ -11620,8 +11627,136 @@ function registerDisk(program2, run) {
   disk.command("download").description("\u0421\u043A\u0430\u0447\u0430\u0442\u044C \u0444\u0430\u0439\u043B \u0432 \u043F\u0430\u043F\u043A\u0443, \u0447\u0442\u043E\u0431\u044B \u043F\u0440\u043E\u0447\u0438\u0442\u0430\u0442\u044C \u0435\u0433\u043E").argument("<id>", "\u043D\u043E\u043C\u0435\u0440 \u0444\u0430\u0439\u043B\u0430").option("--out <\u043F\u0430\u043F\u043A\u0430>", "\u043A\u0443\u0434\u0430 \u0441\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C (\u043E\u0431\u044F\u0437\u0430\u0442\u0435\u043B\u044C\u043D\u043E)").option("--max-mb <n>", "\u043F\u0440\u0435\u0434\u0435\u043B \u0440\u0430\u0437\u043C\u0435\u0440\u0430 (\u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E 100, \u043C\u0430\u043A\u0441\u0438\u043C\u0443\u043C 1024)").action((id, opts) => run((ctx) => diskDownload(ctx, id, opts)));
 }
 
+// src/commands/feed.ts
+var PREVIEW_CHARS = 1e3;
+var isFeedCursor = (v) => isObject2(v) && Number.isSafeInteger(v.s) && Number.isSafeInteger(v.k) && v.s >= 0 && v.k >= 0;
+function plain(raw, tz) {
+  const text = bbToText(raw, /* @__PURE__ */ new Map(), tz);
+  return looksLikeHtml(text) ? htmlToText(text) : text;
+}
+async function feedList(ctx, opts) {
+  const limit = parseLimit(opts.limit, 20, 50);
+  const cursor = opts.page ? decodeCursor(opts.page, "--page", isFeedCursor) : { s: 0, k: 0 };
+  const params = {};
+  if (opts.since) params.LOG_DATE_FROM = parseInputDate(opts.since, "start", "--since", ctx.tz);
+  if (opts.until) params.LOG_DATE_TO = parseInputDate(opts.until, "end", "--until", ctx.tz);
+  params.start = cursor.s;
+  const resp = await ctx.client.call("log.blogpost.get", params);
+  const page = asArray(resp.result).filter(isObject2);
+  const posts = page.slice(cursor.k, cursor.k + limit);
+  const names = await lookupNames(ctx, posts.map((p) => num(p.AUTHOR_ID) ?? 0));
+  const data = posts.map((p) => {
+    const authorId = num(p.AUTHOR_ID) ?? 0;
+    const cut = truncate(plain(str(p.DETAIL_TEXT), ctx.tz), PREVIEW_CHARS);
+    return {
+      id: num(p.ID),
+      date: str(p.DATE_PUBLISH),
+      author: { id: authorId, name: nameOf(names, authorId) },
+      title: str(p.TITLE),
+      text: cut.text,
+      ...cut.truncated ? { truncated: true } : {},
+      comments: num(p.NUM_COMMENTS) ?? 0
+    };
+  });
+  let next = null;
+  if (cursor.k + limit < page.length) next = { s: cursor.s, k: cursor.k + limit };
+  else if (typeof resp.next === "number") next = { s: resp.next, k: 0 };
+  const notes = data.length === 0 ? ["\u041F\u043E\u0441\u0442\u043E\u0432 \u043D\u0435\u0442 \u0437\u0430 \u044D\u0442\u043E\u0442 \u043F\u0435\u0440\u0438\u043E\u0434."] : ["\u041F\u043E\u043B\u043D\u044B\u0439 \u0442\u0435\u043A\u0441\u0442 \u043F\u043E\u0441\u0442\u0430 \u0438 \u043A\u043E\u043C\u043C\u0435\u043D\u0442\u0430\u0440\u0438\u0438 \u2014 feed post <id>."];
+  if (next) notes.push("\u0415\u0441\u0442\u044C \u0435\u0449\u0451 \u043F\u043E\u0441\u0442\u044B: --page <next>.");
+  return envelope(data, next ? encodeCursor(next) : null, notes);
+}
+async function feedPost(ctx, idRaw, opts) {
+  const id = parseId(idRaw, "id");
+  const limit = parseLimit(opts.comments, 20, 50, "--comments");
+  const resp = await ctx.client.call("log.blogpost.get", { POST_ID: id });
+  const p = asArray(resp.result).filter(isObject2)[0];
+  if (!p) throw unexpected2("log.blogpost.get.result");
+  const commentsResp = await ctx.client.call("log.blogcomment.get", { POST_ID: id, LIMIT: limit });
+  const comments = isObject2(commentsResp.result) ? asArray(commentsResp.result.COMMENTS).filter(isObject2) : [];
+  const names = await lookupNames(ctx, [num(p.AUTHOR_ID) ?? 0, ...comments.map((c) => num(c.author_id) ?? 0)]);
+  const authorId = num(p.AUTHOR_ID) ?? 0;
+  const text = plain(str(p.DETAIL_TEXT), ctx.tz);
+  const cut = opts.full ? { text, truncated: false } : truncate(text, MAX_TEXT_CHARS);
+  return envelope({
+    id,
+    date: str(p.DATE_PUBLISH),
+    author: { id: authorId, name: nameOf(names, authorId) },
+    title: str(p.TITLE),
+    text: cut.text,
+    ...cut.truncated ? { truncated: true } : {},
+    comments: comments.map((c) => {
+      const cid = num(c.author_id) ?? 0;
+      return { id: num(c.id), author: { id: cid, name: nameOf(names, cid) }, date: str(c.date), text: truncate(plain(str(c.text), ctx.tz), MAX_TEXT_CHARS).text };
+    })
+  });
+}
+
+// src/commands/kb.ts
+var isCursor2 = (v) => isObject2(v);
+async function kbList(ctx, opts) {
+  const pagination = { limit: parseLimit(opts.limit, 20, 50) };
+  if (opts.page) pagination.afterCursor = decodeCursor(opts.page, "--page", isCursor2);
+  const resp = await ctx.client.callV3("note.collection.list", { pagination });
+  const data = asArray(resp.items).filter(isObject2).map((c) => ({ id: num(c.id), name: str(c.name), updatedAt: str(c.updatedAt) || null, archived: c.isArchived === true }));
+  const next = isObject2(resp.nextCursor) ? encodeCursor(resp.nextCursor) : null;
+  return envelope(data, next, data.length === 0 ? ["\u0411\u0430\u0437 \u0437\u043D\u0430\u043D\u0438\u0439 \u043D\u0435\u0442."] : next ? ["\u0415\u0441\u0442\u044C \u0435\u0449\u0451: --page <next>."] : []);
+}
+async function kbSearch(ctx, text, opts) {
+  if (text.trim().length < 3) {
+    throw new AppError({ code: "APP_CLI_INVALID_ARGUMENT", userMessage: "\u041F\u0430\u0440\u0430\u043C\u0435\u0442\u0440 \u0442\u0435\u043A\u0441\u0442: \u043D\u0443\u0436\u043D\u043E \u043D\u0435 \u043C\u0435\u043D\u044C\u0448\u0435 3 \u0441\u0438\u043C\u0432\u043E\u043B\u043E\u0432." });
+  }
+  const limit = parseLimit(opts.limit, 20, 50);
+  const resp = await ctx.client.callV3("note.document.search.list", { query: text.trim(), pagination: { limit } });
+  const data = asArray(resp.items).filter(isObject2).map((d) => ({ id: num(d.documentId), collectionId: num(d.collectionId), title: str(d.title), snippet: bbToText(str(d.snippet), /* @__PURE__ */ new Map(), ctx.tz) }));
+  const notes = data.length === 0 ? ["\u041D\u0438\u0447\u0435\u0433\u043E \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u043E."] : [];
+  if (resp.hasMore === true) notes.push("\u0415\u0441\u0442\u044C \u0435\u0449\u0451 \u0441\u043E\u0432\u043F\u0430\u0434\u0435\u043D\u0438\u044F \u2014 \u0443\u0442\u043E\u0447\u043D\u0438\u0442\u0435 \u0437\u0430\u043F\u0440\u043E\u0441 \u0438\u043B\u0438 \u0443\u0432\u0435\u043B\u0438\u0447\u044C\u0442\u0435 --limit.");
+  return envelope(data, null, notes);
+}
+function flatten2(items, level, out) {
+  for (const item of items.filter(isObject2)) {
+    out.push({ id: num(item.id), title: str(item.title), level });
+    flatten2(asArray(item.children), level + 1, out);
+  }
+}
+async function kbTree(ctx, collectionRaw) {
+  const resp = await ctx.client.callV3("note.document.tree.list", { collectionId: parseId(collectionRaw, "collectionId") });
+  const out = [];
+  flatten2(asArray(resp.items), 0, out);
+  return envelope(out, null, resp.truncated === true ? ["\u041E\u0433\u043B\u0430\u0432\u043B\u0435\u043D\u0438\u0435 \u043E\u0431\u0440\u0435\u0437\u0430\u043D\u043E \u0411\u0438\u0442\u0440\u0438\u043A\u0441\u043E\u043C \u2014 \u043E\u0442\u043A\u0440\u043E\u0439\u0442\u0435 \u043D\u0443\u0436\u043D\u044B\u0439 \u0440\u0430\u0437\u0434\u0435\u043B \u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0430."] : []);
+}
+async function kbDoc(ctx, idRaw, opts) {
+  const resp = await ctx.client.callV3("note.document.get", { id: parseId(idRaw, "id") });
+  const d = isObject2(resp.item) ? resp.item : {};
+  const markdown = str(d.markdown);
+  const cut = opts.full ? { text: markdown, truncated: false } : truncate(markdown, MAX_TEXT_CHARS);
+  return envelope(
+    {
+      id: num(d.id),
+      collectionId: num(d.collectionId),
+      title: str(d.title),
+      updatedAt: str(d.contentUpdatedAt) || str(d.updatedAt) || null,
+      text: cut.text,
+      ...cut.truncated ? { truncated: true } : {}
+    },
+    null,
+    cut.truncated ? [`\u0414\u043E\u043A\u0443\u043C\u0435\u043D\u0442 \u043E\u0431\u0440\u0435\u0437\u0430\u043D \u043D\u0430 ${MAX_TEXT_CHARS} \u0437\u043D\u0430\u043A\u043E\u0432, \u043F\u043E\u043B\u043D\u043E\u0441\u0442\u044C\u044E \u2014 --full.`] : []
+  );
+}
+
+// src/cli/register-feed-kb.ts
+function registerFeedKb(program2, run) {
+  const feed = program2.command("feed").description("\u0416\u0438\u0432\u0430\u044F \u043B\u0435\u043D\u0442\u0430: \u043D\u043E\u0432\u043E\u0441\u0442\u0438 \u043A\u043E\u043C\u043F\u0430\u043D\u0438\u0438");
+  feed.command("list").description("\u041F\u043E\u0441\u0442\u044B \u043B\u0435\u043D\u0442\u044B (\u043D\u0430\u0447\u0430\u043B\u043E \u0442\u0435\u043A\u0441\u0442\u0430)").option("--since <\u0434\u0430\u0442\u0430>", "\u0441 \u0434\u0430\u0442\u044B \u0413\u0413\u0413\u0413-\u041C\u041C-\u0414\u0414").option("--until <\u0434\u0430\u0442\u0430>", "\u043F\u043E \u0434\u0430\u0442\u0443 \u0413\u0413\u0413\u0413-\u041C\u041C-\u0414\u0414").option("--limit <n>", "\u0441\u043A\u043E\u043B\u044C\u043A\u043E (\u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E 20, \u043C\u0430\u043A\u0441\u0438\u043C\u0443\u043C 50)").option("--page <\u043A\u0443\u0440\u0441\u043E\u0440>", "\u0437\u043D\u0430\u0447\u0435\u043D\u0438\u0435 next \u0438\u0437 \u043F\u0440\u043E\u0448\u043B\u043E\u0433\u043E \u043E\u0442\u0432\u0435\u0442\u0430").action((opts) => run((ctx) => feedList(ctx, opts)));
+  feed.command("post").description("\u041F\u043E\u0441\u0442 \u0446\u0435\u043B\u0438\u043A\u043E\u043C \u0441 \u043A\u043E\u043C\u043C\u0435\u043D\u0442\u0430\u0440\u0438\u044F\u043C\u0438").argument("<id>", "\u043D\u043E\u043C\u0435\u0440 \u043F\u043E\u0441\u0442\u0430").option("--comments <n>", "\u0441\u043A\u043E\u043B\u044C\u043A\u043E \u043A\u043E\u043C\u043C\u0435\u043D\u0442\u0430\u0440\u0438\u0435\u0432 (\u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E 20, \u043C\u0430\u043A\u0441\u0438\u043C\u0443\u043C 50)").option("--full", "\u043D\u0435 \u043E\u0431\u0440\u0435\u0437\u0430\u0442\u044C \u0442\u0435\u043A\u0441\u0442 \u043F\u043E\u0441\u0442\u0430").action((id, opts) => run((ctx) => feedPost(ctx, id, opts)));
+  const kb = program2.command("kb").description("\u0411\u0430\u0437\u0430 \u0437\u043D\u0430\u043D\u0438\u0439");
+  kb.command("list").description("\u041A\u0430\u043A\u0438\u0435 \u0431\u0430\u0437\u044B \u0437\u043D\u0430\u043D\u0438\u0439 \u0435\u0441\u0442\u044C").option("--limit <n>", "\u0441\u043A\u043E\u043B\u044C\u043A\u043E (\u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E 20, \u043C\u0430\u043A\u0441\u0438\u043C\u0443\u043C 50)").option("--page <\u043A\u0443\u0440\u0441\u043E\u0440>", "\u0437\u043D\u0430\u0447\u0435\u043D\u0438\u0435 next \u0438\u0437 \u043F\u0440\u043E\u0448\u043B\u043E\u0433\u043E \u043E\u0442\u0432\u0435\u0442\u0430").action((opts) => run((ctx) => kbList(ctx, opts)));
+  kb.command("search").description("\u041D\u0430\u0439\u0442\u0438 \u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442").argument("<\u0442\u0435\u043A\u0441\u0442>", "\u043D\u0435 \u043C\u0435\u043D\u044C\u0448\u0435 3 \u0441\u0438\u043C\u0432\u043E\u043B\u043E\u0432").option("--limit <n>", "\u0441\u043A\u043E\u043B\u044C\u043A\u043E (\u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E 20, \u043C\u0430\u043A\u0441\u0438\u043C\u0443\u043C 50)").action((text, opts) => run((ctx) => kbSearch(ctx, text, opts)));
+  kb.command("tree").description("\u041E\u0433\u043B\u0430\u0432\u043B\u0435\u043D\u0438\u0435 \u0431\u0430\u0437\u044B \u0437\u043D\u0430\u043D\u0438\u0439").argument("<collectionId>", "\u043D\u043E\u043C\u0435\u0440 \u0431\u0430\u0437\u044B \u0438\u0437 kb list").action((id) => run((ctx) => kbTree(ctx, id)));
+  kb.command("doc").description("\u041F\u0440\u043E\u0447\u0438\u0442\u0430\u0442\u044C \u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442 (Markdown)").argument("<id>", "\u043D\u043E\u043C\u0435\u0440 \u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0430").option("--full", "\u043D\u0435 \u043E\u0431\u0440\u0435\u0437\u0430\u0442\u044C").action((id, opts) => run((ctx) => kbDoc(ctx, id, opts)));
+}
+
 // src/commands/mail.ts
-var PREVIEW_CHARS = 300;
+var PREVIEW_CHARS2 = 300;
 var isPageCursor = (v) => isObject2(v) && typeof v.p === "number" && Number.isSafeInteger(v.p) && v.p >= 1;
 function mailDate(raw) {
   const value = str(raw);
@@ -11680,7 +11815,7 @@ async function mailGet(ctx, idRaw, opts) {
 async function mailThread(ctx, idRaw, opts) {
   const limit = parseLimit(opts.limit, 20, 50);
   const resp = await ctx.client.callV3("mail.message.thread", { id: parseId(idRaw, "id"), limit });
-  const data = (Array.isArray(resp) ? resp : asArray(isObject2(resp) ? resp.items : [])).filter(isObject2).map((m) => ({ id: num(m.id), subject: str(m.subject), from: address(m.from), date: mailDate(m.date), preview: truncate(mailBodyToText(str(m.body)), PREVIEW_CHARS).text }));
+  const data = (Array.isArray(resp) ? resp : asArray(isObject2(resp) ? resp.items : [])).filter(isObject2).map((m) => ({ id: num(m.id), subject: str(m.subject), from: address(m.from), date: mailDate(m.date), preview: truncate(mailBodyToText(str(m.body)), PREVIEW_CHARS2).text }));
   return envelope(data);
 }
 
@@ -11691,6 +11826,102 @@ function registerMail(program2, run) {
   mail.command("list").description("\u041D\u0430\u0439\u0442\u0438 \u043F\u0438\u0441\u044C\u043C\u0430 (\u0431\u0435\u0437 \u0442\u0435\u043A\u0441\u0442\u0430 \u2014 \u0442\u0435\u043A\u0441\u0442 \u0447\u0435\u0440\u0435\u0437 mail get)").option("--box <id>", "\u043D\u043E\u043C\u0435\u0440 \u044F\u0449\u0438\u043A\u0430").option("--search <\u0442\u0435\u043A\u0441\u0442>", "\u043F\u043E\u0438\u0441\u043A \u043F\u043E \u0441\u043E\u0434\u0435\u0440\u0436\u0438\u043C\u043E\u043C\u0443 \u0438 \u0430\u0434\u0440\u0435\u0441\u0430\u043C").option("--since <\u0434\u0430\u0442\u0430>", "\u0441 \u0434\u0430\u0442\u044B \u0413\u0413\u0413\u0413-\u041C\u041C-\u0414\u0414").option("--until <\u0434\u0430\u0442\u0430>", "\u043F\u043E \u0434\u0430\u0442\u0443 \u0413\u0413\u0413\u0413-\u041C\u041C-\u0414\u0414").option("--unread", "\u0442\u043E\u043B\u044C\u043A\u043E \u043D\u0435\u043F\u0440\u043E\u0447\u0438\u0442\u0430\u043D\u043D\u044B\u0435").option("--folder <\u043F\u0430\u043F\u043A\u0430>", "\u043F\u0430\u043F\u043A\u0430 \u044F\u0449\u0438\u043A\u0430").option("--with-attachments", "\u0442\u043E\u043B\u044C\u043A\u043E \u0441 \u0432\u043B\u043E\u0436\u0435\u043D\u0438\u044F\u043C\u0438").option("--limit <n>", "\u0441\u043A\u043E\u043B\u044C\u043A\u043E (\u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E 20, \u043C\u0430\u043A\u0441\u0438\u043C\u0443\u043C 50)").option("--page <\u043A\u0443\u0440\u0441\u043E\u0440>", "\u0437\u043D\u0430\u0447\u0435\u043D\u0438\u0435 next \u0438\u0437 \u043F\u0440\u043E\u0448\u043B\u043E\u0433\u043E \u043E\u0442\u0432\u0435\u0442\u0430").action((opts) => run((ctx) => mailList(ctx, opts)));
   mail.command("get").description("\u041F\u0440\u043E\u0447\u0438\u0442\u0430\u0442\u044C \u043F\u0438\u0441\u044C\u043C\u043E").argument("<id>", "\u043D\u043E\u043C\u0435\u0440 \u043F\u0438\u0441\u044C\u043C\u0430").option("--full", "\u043D\u0435 \u043E\u0431\u0440\u0435\u0437\u0430\u0442\u044C \u0442\u0435\u043A\u0441\u0442").action((id, opts) => run((ctx) => mailGet(ctx, id, opts)));
   mail.command("thread").description("\u0412\u0441\u044F \u0446\u0435\u043F\u043E\u0447\u043A\u0430 \u043F\u043E \u043F\u0438\u0441\u044C\u043C\u0443").argument("<id>", "\u043D\u043E\u043C\u0435\u0440 \u043F\u0438\u0441\u044C\u043C\u0430").option("--limit <n>", "\u0441\u043A\u043E\u043B\u044C\u043A\u043E \u043F\u0438\u0441\u0435\u043C (\u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E 20, \u043C\u0430\u043A\u0441\u0438\u043C\u0443\u043C 50)").action((id, opts) => run((ctx) => mailThread(ctx, id, opts)));
+}
+
+// src/commands/org.ts
+function people(raw) {
+  return asArray(raw).filter(isObject2).map((u) => ({ id: num(u.id ?? u.ID), name: personName(u), position: str(u.work_position ?? u.WORK_POSITION) }));
+}
+function byDepartment(result, id) {
+  return isObject2(result) ? people(result[String(id)]) : [];
+}
+function department(d) {
+  return { id: num(d.id), name: str(d.name), path: str(d.full_name) };
+}
+async function orgMe(ctx, opts) {
+  const limit = parseLimit(opts.limit, MAX_MEMBERS, MAX_MEMBERS);
+  const me = await ctx.client.call("user.current");
+  const ids = asArray(isObject2(me.result) ? me.result.UF_DEPARTMENT : []).map((d) => num(d)).filter((d) => d !== null);
+  let departments = [];
+  if (ids.length > 0) {
+    const deps = await ctx.client.call("im.department.get", { ID: ids, USER_DATA: "N" });
+    const managers = await ctx.client.call("im.department.managers.get", { ID: ids, USER_DATA: "Y" });
+    departments = asArray(deps.result).filter(isObject2).map((d) => ({ ...department(d), managers: byDepartment(managers.result, num(d.id) ?? 0) }));
+  }
+  const colleagues = await ctx.client.call("im.department.colleagues.list", { LIMIT: limit, USER_DATA: "Y" });
+  const list = people(colleagues.result).slice(0, limit);
+  const total = colleagues.total ?? list.length;
+  return envelope({ departments, colleagues: list, colleaguesTotal: total }, null, total > list.length ? [`\u041F\u043E\u043A\u0430\u0437\u0430\u043D\u044B ${list.length} \u043A\u043E\u043B\u043B\u0435\u0433 \u0438\u0437 ${total}.`] : []);
+}
+async function orgFind(ctx, text, opts) {
+  if (text.trim().length < 3) {
+    throw new AppError({ code: "APP_CLI_INVALID_ARGUMENT", userMessage: "\u041F\u0430\u0440\u0430\u043C\u0435\u0442\u0440 \u0442\u0435\u043A\u0441\u0442: \u043D\u0443\u0436\u043D\u043E \u043D\u0435 \u043C\u0435\u043D\u044C\u0448\u0435 3 \u0441\u0438\u043C\u0432\u043E\u043B\u043E\u0432." });
+  }
+  const resp = await ctx.client.call("im.search.department.list", { FIND: text.trim(), LIMIT: parseLimit(opts.limit, 10, 50), USER_DATA: "N" });
+  const data = asArray(resp.result).filter(isObject2).map((d) => ({ ...department(d), managerId: num(d.manager_user_id) }));
+  return envelope(data, null, data.length === 0 ? ["\u041E\u0442\u0434\u0435\u043B\u044B \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u044B."] : []);
+}
+async function orgDepartment(ctx, idRaw, opts) {
+  const id = parseId(idRaw, "id");
+  const limit = parseLimit(opts.limit, MAX_MEMBERS, MAX_MEMBERS);
+  const deps = await ctx.client.call("im.department.get", { ID: [id], USER_DATA: "N" });
+  const d = asArray(deps.result).filter(isObject2)[0];
+  if (!d) {
+    throw new AppError({ code: "APP_B24_NOT_FOUND", userMessage: "\u041D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u043E: \u0442\u0430\u043A\u043E\u0433\u043E \u043E\u0442\u0434\u0435\u043B\u0430 \u043D\u0435\u0442 \u0438\u043B\u0438 \u043E\u043D \u0443\u0434\u0430\u043B\u0451\u043D. \u041F\u0440\u043E\u0432\u0435\u0440\u044C\u0442\u0435 \u043D\u043E\u043C\u0435\u0440." });
+  }
+  const managers = await ctx.client.call("im.department.managers.get", { ID: [id], USER_DATA: "Y" });
+  const employees = await ctx.client.call("im.department.employees.get", { ID: [id], USER_DATA: "Y" });
+  const staff = byDepartment(employees.result, id);
+  return envelope(
+    { ...department(d), managers: byDepartment(managers.result, id), employees: staff.slice(0, limit), employeesTotal: staff.length },
+    null,
+    staff.length > limit ? [`\u041F\u043E\u043A\u0430\u0437\u0430\u043D\u044B ${limit} \u0441\u043E\u0442\u0440\u0443\u0434\u043D\u0438\u043A\u043E\u0432 \u0438\u0437 ${staff.length}.`] : []
+  );
+}
+
+// src/commands/worktime.ts
+var STATUS = { OPENED: "\u0438\u0434\u0451\u0442", CLOSED: "\u0437\u0430\u043A\u0440\u044B\u0442", PAUSED: "\u043D\u0430 \u043F\u0430\u0443\u0437\u0435", EXPIRED: "\u043D\u0435 \u0437\u0430\u043A\u0440\u044B\u0442 \u0432\u043E\u0432\u0440\u0435\u043C\u044F" };
+async function worktimeStatus(ctx) {
+  const resp = await ctx.client.call("timeman.status");
+  const r = isObject2(resp.result) ? resp.result : {};
+  return envelope({
+    status: STATUS[str(r.STATUS)] ?? str(r.STATUS),
+    start: str(r.TIME_START) || null,
+    finish: str(r.TIME_FINISH) || null,
+    duration: str(r.DURATION) || null,
+    breaks: str(r.TIME_LEAKS) || null
+  });
+}
+async function worktimeRecords(ctx, opts) {
+  if (!opts.from || !opts.to) {
+    throw new AppError({ code: "APP_CLI_INVALID_ARGUMENT", userMessage: "\u0423\u043A\u0430\u0436\u0438\u0442\u0435 \u043F\u0435\u0440\u0438\u043E\u0434: --from \u0413\u0413\u0413\u0413-\u041C\u041C-\u0414\u0414 \u0438 --to \u0413\u0413\u0413\u0413-\u041C\u041C-\u0414\u0414." });
+  }
+  const limit = parseLimit(opts.limit, 31, 100);
+  const resp = await ctx.client.callV3("timeman.record.list", {
+    // Условие на userId обязательно и только через «=» (timeman-record-list.md).
+    filter: [
+      ["userId", ctx.webhook.userId],
+      ["startTime", "between", [parseInputDate(opts.from, "start", "--from", ctx.tz), parseInputDate(opts.to, "end", "--to", ctx.tz)]]
+    ],
+    select: ["id", "startTime", "endTime", "duration", "breakLength", "state"],
+    order: { startTime: "DESC" },
+    pagination: { limit }
+  });
+  const records = asArray(resp.items).filter(isObject2).map((r) => ({ id: num(r.id), start: str(r.startTime), end: str(r.endTime) || null, durationSeconds: num(r.duration), breakSeconds: num(r.breakLength), state: str(r.state) }));
+  const totalSeconds = records.reduce((sum, r) => sum + (r.durationSeconds ?? 0), 0);
+  const notes = records.length === 0 ? ["\u0417\u0430\u043F\u0438\u0441\u0435\u0439 \u043D\u0435\u0442 \u0437\u0430 \u044D\u0442\u043E\u0442 \u043F\u0435\u0440\u0438\u043E\u0434."] : records.length >= limit ? [`\u041F\u043E\u043A\u0430\u0437\u0430\u043D\u044B ${limit} \u0437\u0430\u043F\u0438\u0441\u0435\u0439 \u2014 \u0443\u0432\u0435\u043B\u0438\u0447\u044C\u0442\u0435 --limit \u0438\u043B\u0438 \u0441\u0443\u0437\u044C\u0442\u0435 \u043F\u0435\u0440\u0438\u043E\u0434.`] : [];
+  return envelope({ records, totalSeconds }, null, notes);
+}
+
+// src/cli/register-org-worktime.ts
+function registerOrgWorktime(program2, run) {
+  const org = program2.command("org").description("\u041E\u0440\u0433\u0441\u0442\u0440\u0443\u043A\u0442\u0443\u0440\u0430");
+  org.command("me").description("\u041C\u043E\u0438 \u043E\u0442\u0434\u0435\u043B\u044B, \u0440\u0443\u043A\u043E\u0432\u043E\u0434\u0438\u0442\u0435\u043B\u0438 \u0438 \u043A\u043E\u043B\u043B\u0435\u0433\u0438").option("--limit <n>", "\u0441\u043A\u043E\u043B\u044C\u043A\u043E \u043A\u043E\u043B\u043B\u0435\u0433 (\u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E \u0438 \u043C\u0430\u043A\u0441\u0438\u043C\u0443\u043C 50)").action((opts) => run((ctx) => orgMe(ctx, opts)));
+  org.command("find").description("\u041D\u0430\u0439\u0442\u0438 \u043E\u0442\u0434\u0435\u043B \u043F\u043E \u043D\u0430\u0437\u0432\u0430\u043D\u0438\u044E").argument("<\u0442\u0435\u043A\u0441\u0442>", "\u043D\u0435 \u043C\u0435\u043D\u044C\u0448\u0435 3 \u0441\u0438\u043C\u0432\u043E\u043B\u043E\u0432").option("--limit <n>", "\u0441\u043A\u043E\u043B\u044C\u043A\u043E (\u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E 10, \u043C\u0430\u043A\u0441\u0438\u043C\u0443\u043C 50)").action((text, opts) => run((ctx) => orgFind(ctx, text, opts)));
+  org.command("department").description("\u041E\u0442\u0434\u0435\u043B: \u0440\u0443\u043A\u043E\u0432\u043E\u0434\u0438\u0442\u0435\u043B\u0438 \u0438 \u0441\u043E\u0442\u0440\u0443\u0434\u043D\u0438\u043A\u0438").argument("<id>", "\u043D\u043E\u043C\u0435\u0440 \u043E\u0442\u0434\u0435\u043B\u0430").option("--limit <n>", "\u0441\u043A\u043E\u043B\u044C\u043A\u043E \u0441\u043E\u0442\u0440\u0443\u0434\u043D\u0438\u043A\u043E\u0432 (\u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E \u0438 \u043C\u0430\u043A\u0441\u0438\u043C\u0443\u043C 50)").action((id, opts) => run((ctx) => orgDepartment(ctx, id, opts)));
+  const worktime = program2.command("worktime").description("\u0420\u0430\u0431\u043E\u0447\u0435\u0435 \u0432\u0440\u0435\u043C\u044F");
+  worktime.command("status").description("\u0418\u0434\u0451\u0442 \u043B\u0438 \u0441\u0435\u0439\u0447\u0430\u0441 \u043C\u043E\u0439 \u0440\u0430\u0431\u043E\u0447\u0438\u0439 \u0434\u0435\u043D\u044C").action(() => run((ctx) => worktimeStatus(ctx)));
+  worktime.command("records").description("\u0421\u043A\u043E\u043B\u044C\u043A\u043E \u044F \u043E\u0442\u0440\u0430\u0431\u043E\u0442\u0430\u043B \u0437\u0430 \u043F\u0435\u0440\u0438\u043E\u0434").option("--from <\u0434\u0430\u0442\u0430>", "\u0441 \u0434\u0430\u0442\u044B \u0413\u0413\u0413\u0413-\u041C\u041C-\u0414\u0414 (\u043E\u0431\u044F\u0437\u0430\u0442\u0435\u043B\u044C\u043D\u043E)").option("--to <\u0434\u0430\u0442\u0430>", "\u043F\u043E \u0434\u0430\u0442\u0443 \u0413\u0413\u0413\u0413-\u041C\u041C-\u0414\u0414 (\u043E\u0431\u044F\u0437\u0430\u0442\u0435\u043B\u044C\u043D\u043E)").option("--limit <n>", "\u0441\u043A\u043E\u043B\u044C\u043A\u043E \u0437\u0430\u043F\u0438\u0441\u0435\u0439 (\u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E 31, \u043C\u0430\u043A\u0441\u0438\u043C\u0443\u043C 100)").action((opts) => run((ctx) => worktimeRecords(ctx, opts)));
 }
 
 // src/commands/projects.ts
@@ -11804,7 +12035,7 @@ async function projectsGet(ctx, idRaw) {
 }
 
 // src/commands/tasks.ts
-var STATUS = {
+var STATUS2 = {
   "1": "\u043D\u043E\u0432\u0430\u044F",
   "2": "\u0436\u0434\u0451\u0442 \u0432\u044B\u043F\u043E\u043B\u043D\u0435\u043D\u0438\u044F",
   "3": "\u0432\u044B\u043F\u043E\u043B\u043D\u044F\u0435\u0442\u0441\u044F",
@@ -11854,7 +12085,7 @@ function person(raw) {
   return id === null ? null : { id, name: str(raw.name) };
 }
 function statusName(raw) {
-  return STATUS[str(raw)] ?? str(raw);
+  return STATUS2[str(raw)] ?? str(raw);
 }
 function summary(t, roles) {
   return {
@@ -12150,6 +12381,8 @@ function buildProgram(run = runCommand) {
   registerDisk(program2, run);
   registerMail(program2, run);
   registerCalendarMeetings(program2, run);
+  registerFeedKb(program2, run);
+  registerOrgWorktime(program2, run);
   return program2;
 }
 var HELP_CODES = /* @__PURE__ */ new Set(["commander.helpDisplayed", "commander.help", "commander.version"]);

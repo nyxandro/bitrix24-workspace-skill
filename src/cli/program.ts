@@ -11,7 +11,9 @@ import { APP_VERSION, CLI_NAME } from '../config/config.js';
 import { registerCalendarMeetings } from './register-calendar-meetings.js';
 import { registerChats } from './register-chats.js';
 import { registerDisk } from './register-disk.js';
+import { registerFeedKb } from './register-feed-kb.js';
 import { registerMail } from './register-mail.js';
+import { registerOrgWorktime } from './register-org-worktime.js';
 import { registerProjectsTasks } from './register-projects-tasks.js';
 import { registerStatusUsers } from './register-status-users.js';
 import { runCommand, type Runner } from './runtime.js';
@@ -33,6 +35,8 @@ export function buildProgram(run: Runner = runCommand): Command {
   registerDisk(program, run);
   registerMail(program, run);
   registerCalendarMeetings(program, run);
+  registerFeedKb(program, run);
+  registerOrgWorktime(program, run);
   return program;
 }
 

@@ -107,3 +107,25 @@ export function unexpected(field: string): AppError {
     details: { field },
   });
 }
+
+const USER_GET_PAGE = 50; // user.get отдаёт не больше 50 человек за раз
+const MAX_NAME_LOOKUP = 200;
+
+// Имена сотрудников по номерам: порциями по 50, не больше 200 за команду.
+// Кого Битрикс не отдал (уволен, внешний), остаются без имени.
+export async function lookupNames(ctx: CommandContext, ids: Iterable<number>): Promise<Map<number, string>> {
+  const wanted = [...new Set(ids)].filter((id) => id > 0).slice(0, MAX_NAME_LOOKUP);
+  const names = new Map<number, string>();
+  for (let i = 0; i < wanted.length; i += USER_GET_PAGE) {
+    const resp = await ctx.client.call<unknown>('user.get', { filter: { ID: wanted.slice(i, i + USER_GET_PAGE) } });
+    for (const u of asArray(resp.result).filter(isObject)) {
+      const id = num(u.ID);
+      if (id !== null) names.set(id, personName(u));
+    }
+  }
+  return names;
+}
+
+export function nameOf(names: Map<number, string>, id: number): string {
+  return names.get(id) ?? `сотрудник ${id}`;
+}

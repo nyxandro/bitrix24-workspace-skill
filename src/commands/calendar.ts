@@ -10,10 +10,8 @@ import { calendarDate, formatInZone, parseInputDate } from '../render/dates.js';
 import { htmlToText, looksLikeHtml } from '../render/html.js';
 import type { Envelope } from '../render/output.js';
 import { bbToText, truncate } from '../render/text.js';
-import { asArray, type CommandContext, envelope, isObject, type Json, num, parseId, parseLimit, personName, str } from './common.js';
+import { asArray, type CommandContext, envelope, isObject, type Json, lookupNames, nameOf, num, parseId, parseLimit, str } from './common.js';
 
-const USER_GET_PAGE = 50; // user.get отдаёт не больше 50 человек за раз
-const MAX_ATTENDEE_LOOKUP = 200;
 const RESPONSES: Readonly<Record<string, string>> = { Y: 'принял', N: 'отклонил', Q: 'не ответил', H: 'организатор' };
 
 function invalid(message: string): AppError {
@@ -24,19 +22,11 @@ function isRecurring(rrule: unknown): boolean {
   return isObject(rrule) ? Object.keys(rrule).length > 0 : str(rrule).trim() !== '';
 }
 
-async function attendeeNames(ctx: CommandContext, events: Json[]): Promise<Map<number, string>> {
-  const ids = [...new Set(events.flatMap((e) => asArray(e.ATTENDEE_LIST).filter(isObject).map((a) => num(a.id))).filter((id): id is number => id !== null))];
-  const names = new Map<number, string>();
-  if (ids.length === 0) return names;
-  const wanted = ids.slice(0, MAX_ATTENDEE_LOOKUP);
-  for (let i = 0; i < wanted.length; i += USER_GET_PAGE) {
-    const resp = await ctx.client.call<unknown>('user.get', { filter: { ID: wanted.slice(i, i + USER_GET_PAGE) } });
-    for (const u of asArray(resp.result).filter(isObject)) {
-      const id = num(u.ID);
-      if (id !== null) names.set(id, personName(u));
-    }
-  }
-  return names;
+function attendeeNames(ctx: CommandContext, events: Json[]): Promise<Map<number, string>> {
+  return lookupNames(
+    ctx,
+    events.flatMap((e) => asArray(e.ATTENDEE_LIST).filter(isObject).map((a) => num(a.id))).filter((id): id is number => id !== null),
+  );
 }
 
 function toEvent(e: Json, names: Map<number, string>) {
@@ -54,7 +44,7 @@ function toEvent(e: Json, names: Map<number, string>) {
       .filter(isObject)
       .map((a) => {
         const id = num(a.id) ?? 0;
-        return { id, name: names.get(id) ?? `сотрудник ${id}`, response: RESPONSES[str(a.status)] ?? str(a.status) };
+        return { id, name: nameOf(names, id), response: RESPONSES[str(a.status)] ?? str(a.status) };
       }),
   };
 }
