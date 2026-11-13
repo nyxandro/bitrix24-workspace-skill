@@ -3795,6 +3795,7 @@ var {
 // src/config/config.ts
 var import_node_os = __toESM(require("node:os"), 1);
 var import_node_path = __toESM(require("node:path"), 1);
+var APP_NAME = "bitrix24-workspace-skill";
 var APP_VERSION = "0.1.0";
 var CLI_NAME = "b24";
 var CONFIG_DIR = import_node_path.default.join(import_node_os.default.homedir(), ".config", "bitrix24-workspace");
@@ -3802,6 +3803,7 @@ var ENV_PATH = import_node_path.default.join(CONFIG_DIR, ".env");
 var ENV_PATH_DISPLAY = "~/.config/bitrix24-workspace/.env";
 var WEBHOOK_ENV = "BITRIX24_WORKSPACE_WEBHOOK_URL";
 var DEBUG_ENV = "B24_DEBUG";
+var USER_AGENT = `${APP_NAME}/${APP_VERSION}`;
 
 // src/cli/program.ts
 function buildProgram() {

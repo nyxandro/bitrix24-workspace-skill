@@ -20,3 +20,12 @@ export const ENV_PATH = path.join(CONFIG_DIR, '.env');
 export const ENV_PATH_DISPLAY = '~/.config/bitrix24-workspace/.env';
 export const WEBHOOK_ENV = 'BITRIX24_WORKSPACE_WEBHOOK_URL';
 export const DEBUG_ENV = 'B24_DEBUG';
+
+// Сеть. Облачный Битрикс24 держит 2 запроса в секунду без блокировки
+// (limits.md), один запрос — не дольше 60 с.
+export const USER_AGENT = `${APP_NAME}/${APP_VERSION}`;
+export const MIN_REQUEST_INTERVAL_MS = 500;
+export const REQUEST_TIMEOUT_MS = 60_000;
+// Скачивание: обрываем, только если данные перестали идти, а не по общему
+// времени — иначе большой файл на медленной сети не скачать никогда.
+export const DOWNLOAD_IDLE_TIMEOUT_MS = 60_000;
