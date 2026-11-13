@@ -9,6 +9,7 @@ import { Command, CommanderError } from 'commander';
 import { AppError } from '../api/errors.js';
 import { APP_VERSION, CLI_NAME } from '../config/config.js';
 import { registerChats } from './register-chats.js';
+import { registerProjectsTasks } from './register-projects-tasks.js';
 import { registerStatusUsers } from './register-status-users.js';
 import { runCommand, type Runner } from './runtime.js';
 
@@ -25,6 +26,7 @@ export function buildProgram(run: Runner = runCommand): Command {
     .configureOutput({ writeErr: () => undefined, outputError: () => undefined });
   registerStatusUsers(program, run);
   registerChats(program, run);
+  registerProjectsTasks(program, run);
   return program;
 }
 

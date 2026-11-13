@@ -3974,7 +3974,8 @@ var SCOPE_BY_PREFIX = [
   ["scope", "basic"],
   ["user.", "user_basic"],
   ["im.", "im"],
-  ["socialnetwork.", "sonet_group"],
+  // socialnetwork.api.* требует отдельного права socialnetwork, а не sonet_group (проверено на портале).
+  ["socialnetwork.", "socialnetwork"],
   ["sonet_group.", "sonet_group"],
   ["tasks.", "task"],
   ["task.", "task"],
@@ -3990,7 +3991,8 @@ var SCOPE_SECTIONS = {
   basic: "\u043E\u0441\u043D\u043E\u0432\u0430",
   user_basic: "\u0441\u043E\u0442\u0440\u0443\u0434\u043D\u0438\u043A\u0438",
   im: "\u0447\u0430\u0442\u044B, \u0443\u0432\u0435\u0434\u043E\u043C\u043B\u0435\u043D\u0438\u044F \u0438 \u043E\u0440\u0433\u0441\u0442\u0440\u0443\u043A\u0442\u0443\u0440\u0430",
-  sonet_group: "\u043F\u0440\u043E\u0435\u043A\u0442\u044B",
+  sonet_group: "\u043F\u0440\u043E\u0435\u043A\u0442\u044B (\u0443\u0447\u0430\u0441\u0442\u043D\u0438\u043A\u0438)",
+  socialnetwork: "\u043F\u0440\u043E\u0435\u043A\u0442\u044B (\u0441\u043F\u0438\u0441\u043E\u043A \u0438 \u043A\u0430\u0440\u0442\u043E\u0447\u043A\u0430)",
   task: "\u0437\u0430\u0434\u0430\u0447\u0438",
   disk: "\u0434\u0438\u0441\u043A",
   calendar: "\u043A\u0430\u043B\u0435\u043D\u0434\u0430\u0440\u044C",
@@ -4835,6 +4837,9 @@ function num(value) {
 function parseLimit(raw, def, max, option = "--limit") {
   return raw === void 0 ? def : parsePositiveInt(raw, option, max);
 }
+function parseId(raw, option) {
+  return parsePositiveInt(raw, option);
+}
 function encodeCursor(value) {
   return Buffer.from(JSON.stringify(value), "utf8").toString("base64url");
 }
@@ -5159,6 +5164,284 @@ function registerChats(program2, run) {
   program2.command("notifications").description("\u0423\u0432\u0435\u0434\u043E\u043C\u043B\u0435\u043D\u0438\u044F: \u0443\u043F\u043E\u043C\u0438\u043D\u0430\u043D\u0438\u044F, \u043F\u043E\u0440\u0443\u0447\u0435\u043D\u0438\u044F, \u043F\u0440\u0438\u0433\u043B\u0430\u0448\u0435\u043D\u0438\u044F").option("--limit <n>", "\u0441\u043A\u043E\u043B\u044C\u043A\u043E (\u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E 20, \u043C\u0430\u043A\u0441\u0438\u043C\u0443\u043C 50)").option("--before <\u043A\u0443\u0440\u0441\u043E\u0440>", "\u0437\u043D\u0430\u0447\u0435\u043D\u0438\u0435 next \u0438\u0437 \u043F\u0440\u043E\u0448\u043B\u043E\u0433\u043E \u043E\u0442\u0432\u0435\u0442\u0430").action((opts) => run((ctx) => notifications(ctx, opts)));
 }
 
+// src/commands/projects.ts
+var GROUP_TYPES = ["group", "project", "scrum", "collab"];
+var PAGE2 = 50;
+var MAX_PAGES = 10;
+var ROLE_NAMES = { A: "\u0432\u043B\u0430\u0434\u0435\u043B\u0435\u0446", E: "\u043C\u043E\u0434\u0435\u0440\u0430\u0442\u043E\u0440", K: "\u0443\u0447\u0430\u0441\u0442\u043D\u0438\u043A", Z: "\u0437\u0430\u043F\u0440\u043E\u0441 \u043D\u0430 \u0432\u0441\u0442\u0443\u043F\u043B\u0435\u043D\u0438\u0435" };
+var isStartCursor = (v) => isObject2(v) && typeof v.s === "number" && Number.isSafeInteger(v.s) && v.s >= 0;
+function pick(obj, camel, upper) {
+  return obj[camel] !== void 0 ? obj[camel] : obj[upper];
+}
+async function myGroupIds(ctx) {
+  const resp = await ctx.client.call("sonet_group.user.groups");
+  return new Set(asArray(resp.result).filter(isObject2).map((g) => num(g.GROUP_ID)).filter((id) => id !== null));
+}
+async function projectsList(ctx, opts) {
+  const limit = parseLimit(opts.limit, 20, 50);
+  if (opts.type && !GROUP_TYPES.includes(opts.type)) {
+    throw new AppError({ code: "APP_CLI_INVALID_ARGUMENT", userMessage: `\u041F\u0430\u0440\u0430\u043C\u0435\u0442\u0440 --type: \u043E\u0436\u0438\u0434\u0430\u0435\u0442\u0441\u044F ${GROUP_TYPES.join(" | ")}, \u043F\u043E\u043B\u0443\u0447\u0435\u043D\u043E \xAB${opts.type}\xBB.` });
+  }
+  const mine = await myGroupIds(ctx);
+  const filter = {};
+  if (opts.search?.trim()) filter["%NAME"] = opts.search.trim();
+  if (opts.mine) {
+    if (mine.size === 0) return envelope([], null, ["\u0412\u044B \u043D\u0435 \u0441\u043E\u0441\u0442\u043E\u0438\u0442\u0435 \u043D\u0438 \u0432 \u043E\u0434\u043D\u043E\u0439 \u0433\u0440\u0443\u043F\u043F\u0435."]);
+    filter.ID = [...mine];
+  }
+  let start = opts.page ? decodeCursor(opts.page, "--page", isStartCursor).s : 0;
+  const collected = [];
+  let nextStart = null;
+  let stoppedByPages = false;
+  for (let pages = 0; ; pages++) {
+    if (pages >= MAX_PAGES) {
+      stoppedByPages = true;
+      nextStart = start;
+      break;
+    }
+    const resp = await ctx.client.call("socialnetwork.api.workgroup.list", {
+      filter,
+      select: ["ID", "NAME", "TYPE", "NUMBER_OF_MEMBERS", "CLOSED"],
+      params: { shouldSelectDialogId: "Y" },
+      start
+    });
+    const groups = isObject2(resp.result) ? asArray(resp.result.workgroups).filter(isObject2) : [];
+    let i = 0;
+    for (; i < groups.length && collected.length < limit; i++) {
+      const g = groups[i];
+      if (!opts.type || str(pick(g, "type", "TYPE")) === opts.type) collected.push(g);
+    }
+    const morePages = typeof resp.next === "number" && groups.length > 0;
+    if (collected.length >= limit) {
+      nextStart = i < groups.length || morePages ? start + i : null;
+      break;
+    }
+    if (!morePages) break;
+    start = resp.next;
+  }
+  const data = collected.map((g) => {
+    const id = num(pick(g, "id", "ID")) ?? 0;
+    return {
+      id,
+      name: str(pick(g, "name", "NAME")),
+      type: str(pick(g, "type", "TYPE")),
+      isMember: mine.has(id),
+      members: num(pick(g, "numberOfMembers", "NUMBER_OF_MEMBERS")),
+      dialogId: str(g.dialogId) || `sg${id}`
+    };
+  });
+  const notes = [];
+  if (data.length === 0) notes.push("\u041D\u0438\u0447\u0435\u0433\u043E \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u043E.");
+  if (stoppedByPages) notes.push(`\u041F\u0440\u043E\u0441\u043C\u043E\u0442\u0440\u0435\u043D\u043E ${MAX_PAGES * PAGE2} \u0433\u0440\u0443\u043F\u043F; \u043F\u0440\u043E\u0434\u043E\u043B\u0436\u0438\u0442\u044C \u043F\u043E\u0438\u0441\u043A \u2014 --page <next>.`);
+  else if (nextStart !== null) notes.push("\u0415\u0441\u0442\u044C \u0435\u0449\u0451: --page <next>.");
+  return envelope(data, nextStart !== null ? encodeCursor({ s: nextStart }) : null, notes);
+}
+async function projectsGet(ctx, idRaw) {
+  const id = parseId(idRaw, "id");
+  const resp = await ctx.client.call("socialnetwork.api.workgroup.get", { params: { groupId: id } });
+  const g = isObject2(resp.result) ? resp.result : {};
+  const memberRows = await ctx.client.call("sonet_group.user.get", { ID: id });
+  const rows = asArray(memberRows.result).filter(isObject2);
+  const shown = rows.slice(0, MAX_MEMBERS);
+  const ids = shown.map((r) => num(r.USER_ID)).filter((u) => u !== null);
+  const names = /* @__PURE__ */ new Map();
+  if (ids.length > 0) {
+    const users = await ctx.client.call("user.get", { filter: { ID: ids } });
+    for (const u of asArray(users.result).filter(isObject2)) {
+      const uid = num(u.ID);
+      if (uid !== null) names.set(uid, personName(u));
+    }
+  }
+  const description = truncate(bbToText(str(pick(g, "description", "DESCRIPTION")), /* @__PURE__ */ new Map(), ctx.tz), MAX_TEXT_CHARS);
+  const total = Math.max(num(pick(g, "numberOfMembers", "NUMBER_OF_MEMBERS")) ?? 0, rows.length);
+  return envelope(
+    {
+      id,
+      name: str(pick(g, "name", "NAME")),
+      description: description.text,
+      ...description.truncated ? { descriptionTruncated: true } : {},
+      type: str(pick(g, "type", "TYPE")),
+      ownerId: num(pick(g, "ownerId", "OWNER_ID")),
+      dialogId: `sg${id}`,
+      members: shown.map((r) => {
+        const uid = num(r.USER_ID) ?? 0;
+        return { id: uid, name: names.get(uid) ?? `\u0441\u043E\u0442\u0440\u0443\u0434\u043D\u0438\u043A ${uid}`, role: ROLE_NAMES[str(r.ROLE)] ?? str(r.ROLE) };
+      }),
+      membersTotal: total
+    },
+    null,
+    total > shown.length ? [`\u041F\u043E\u043A\u0430\u0437\u0430\u043D\u044B \u043F\u0435\u0440\u0432\u044B\u0435 ${shown.length} \u0443\u0447\u0430\u0441\u0442\u043D\u0438\u043A\u043E\u0432 \u0438\u0437 ${total}.`] : []
+  );
+}
+
+// src/commands/tasks.ts
+var STATUS = {
+  "1": "\u043D\u043E\u0432\u0430\u044F",
+  "2": "\u0436\u0434\u0451\u0442 \u0432\u044B\u043F\u043E\u043B\u043D\u0435\u043D\u0438\u044F",
+  "3": "\u0432\u044B\u043F\u043E\u043B\u043D\u044F\u0435\u0442\u0441\u044F",
+  "4": "\u0436\u0434\u0451\u0442 \u043A\u043E\u043D\u0442\u0440\u043E\u043B\u044F",
+  "5": "\u0437\u0430\u0432\u0435\u0440\u0448\u0435\u043D\u0430",
+  "6": "\u043E\u0442\u043B\u043E\u0436\u0435\u043D\u0430",
+  "7": "\u043E\u0442\u043A\u043B\u043E\u043D\u0435\u043D\u0430"
+};
+var ROLE_FIELDS = {
+  responsible: "RESPONSIBLE_ID",
+  creator: "CREATED_BY",
+  accomplice: "ACCOMPLICE",
+  auditor: "AUDITOR"
+};
+var ROLE_NAMES2 = {
+  responsible: "\u043E\u0442\u0432\u0435\u0442\u0441\u0442\u0432\u0435\u043D\u043D\u044B\u0439",
+  creator: "\u043F\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u0449\u0438\u043A",
+  accomplice: "\u0441\u043E\u0438\u0441\u043F\u043E\u043B\u043D\u0438\u0442\u0435\u043B\u044C",
+  auditor: "\u043D\u0430\u0431\u043B\u044E\u0434\u0430\u0442\u0435\u043B\u044C"
+};
+var LIST_SELECT = ["ID", "TITLE", "STATUS", "DEADLINE", "CHANGED_DATE", "RESPONSIBLE_ID", "CREATED_BY", "GROUP_ID"];
+var GET_SELECT = [
+  "ID",
+  "TITLE",
+  "DESCRIPTION",
+  "STATUS",
+  "DEADLINE",
+  "CREATED_BY",
+  "RESPONSIBLE_ID",
+  "ACCOMPLICES",
+  "AUDITORS",
+  "GROUP_ID",
+  "CHAT_ID",
+  "CREATED_DATE",
+  "CHANGED_DATE",
+  "CLOSED_DATE"
+];
+var PAGE3 = 50;
+var IM_DIALOG_RE = /IM_DIALOG=(chat\d+|\d+)/g;
+var isStartCursor2 = (v) => isObject2(v) && typeof v.s === "number" && Number.isSafeInteger(v.s) && v.s >= 0;
+function invalid3(message) {
+  return new AppError({ code: "APP_CLI_INVALID_ARGUMENT", userMessage: message });
+}
+function person(raw) {
+  if (!isObject2(raw)) return null;
+  const id = num(raw.id);
+  return id === null ? null : { id, name: str(raw.name) };
+}
+function statusName(raw) {
+  return STATUS[str(raw)] ?? str(raw);
+}
+function summary(t, roles) {
+  return {
+    id: num(t.id) ?? 0,
+    title: str(t.title),
+    status: statusName(t.status),
+    deadline: str(t.deadline) || null,
+    changedDate: str(t.changedDate) || null,
+    responsible: person(t.responsible),
+    project: person(t.group),
+    myRoles: roles.map((r) => ROLE_NAMES2[r] ?? r)
+  };
+}
+async function tasksList(ctx, opts) {
+  const role = opts.role ?? "any";
+  const status2 = opts.status ?? "active";
+  if (role !== "any" && !ROLE_FIELDS[role]) {
+    throw invalid3(`\u041F\u0430\u0440\u0430\u043C\u0435\u0442\u0440 --role: \u043E\u0436\u0438\u0434\u0430\u0435\u0442\u0441\u044F responsible | creator | accomplice | auditor | any, \u043F\u043E\u043B\u0443\u0447\u0435\u043D\u043E \xAB${role}\xBB.`);
+  }
+  if (!["active", "done", "all"].includes(status2)) {
+    throw invalid3(`\u041F\u0430\u0440\u0430\u043C\u0435\u0442\u0440 --status: \u043E\u0436\u0438\u0434\u0430\u0435\u0442\u0441\u044F active | done | all, \u043F\u043E\u043B\u0443\u0447\u0435\u043D\u043E \xAB${status2}\xBB.`);
+  }
+  if (opts.page && role === "any") {
+    throw invalid3("\u041F\u0430\u0440\u0430\u043C\u0435\u0442\u0440 --page \u0440\u0430\u0431\u043E\u0442\u0430\u0435\u0442 \u0442\u043E\u043B\u044C\u043A\u043E \u0441 \u043E\u0434\u043D\u043E\u0439 \u0440\u043E\u043B\u044C\u044E: \u0443\u043A\u0430\u0436\u0438\u0442\u0435 --role.");
+  }
+  const limit = parseLimit(opts.limit, 20, PAGE3);
+  const base = {};
+  if (status2 === "active") base["<REAL_STATUS"] = 5;
+  if (status2 === "done") base.REAL_STATUS = 5;
+  if (opts.project) base.GROUP_ID = parseId(opts.project, "--project");
+  if (opts.search?.trim()) base["%TITLE"] = opts.search.trim();
+  const start = opts.page ? decodeCursor(opts.page, "--page", isStartCursor2).s : 0;
+  const roles = role === "any" ? Object.keys(ROLE_FIELDS) : [role];
+  const merged = /* @__PURE__ */ new Map();
+  let next;
+  let anyFull = false;
+  for (const r of roles) {
+    const resp = await ctx.client.call("tasks.task.list", {
+      filter: { [ROLE_FIELDS[r]]: ctx.webhook.userId, ...base },
+      select: LIST_SELECT,
+      order: { CHANGED_DATE: "desc" },
+      start
+    });
+    const tasks = isObject2(resp.result) ? asArray(resp.result.tasks).filter(isObject2) : [];
+    anyFull ||= tasks.length >= PAGE3;
+    next = resp.next;
+    for (const t of tasks) {
+      const id = num(t.id);
+      if (id === null) continue;
+      const entry = merged.get(id) ?? { task: t, roles: [] };
+      entry.roles.push(r);
+      merged.set(id, entry);
+    }
+  }
+  const sorted = [...merged.values()].sort((a, b) => (Date.parse(str(b.task.changedDate)) || 0) - (Date.parse(str(a.task.changedDate)) || 0)).slice(0, limit).map((e) => summary(e.task, e.roles));
+  const notes = [];
+  if (sorted.length === 0) notes.push("\u0417\u0430\u0434\u0430\u0447 \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u043E.");
+  let cursor = null;
+  if (role !== "any" && typeof next === "number") {
+    cursor = encodeCursor({ s: next });
+    notes.push("\u0415\u0441\u0442\u044C \u0435\u0449\u0451 \u0437\u0430\u0434\u0430\u0447\u0438: --page <next>.");
+  } else if (role === "any" && (anyFull || merged.size > limit)) {
+    notes.push("\u041F\u043E\u043A\u0430\u0437\u0430\u043D\u044B \u043F\u043E\u0441\u043B\u0435\u0434\u043D\u0438\u0435 \u0438\u0437\u043C\u0435\u043D\u0451\u043D\u043D\u044B\u0435 \u0437\u0430\u0434\u0430\u0447\u0438 \u043F\u043E \u0432\u0441\u0435\u043C \u0432\u0430\u0448\u0438\u043C \u0440\u043E\u043B\u044F\u043C; \u043F\u043E\u043B\u043D\u044B\u0439 \u0441\u043F\u0438\u0441\u043E\u043A \u2014 \u0441 --role \u0438 --page.");
+  }
+  return envelope(sorted, cursor, notes);
+}
+async function tasksGet(ctx, idRaw, opts) {
+  const id = parseId(idRaw, "id");
+  const resp = await ctx.client.call("tasks.task.get", { taskId: id, select: GET_SELECT });
+  const t = isObject2(resp.result) && isObject2(resp.result.task) ? resp.result.task : {};
+  const rawDescription = str(t.description);
+  const text = bbToText(rawDescription, /* @__PURE__ */ new Map(), ctx.tz);
+  const description = opts.full ? { text, truncated: false } : truncate(text, MAX_TEXT_CHARS);
+  const linkedDialogs = [...new Set([...rawDescription.matchAll(IM_DIALOG_RE)].map((m) => m[1]))];
+  const chatId = num(t.chatId);
+  const checklistResp = await ctx.client.call("task.checklistitem.getlist", { TASKID: id });
+  const checklist = asArray(checklistResp.result).filter(isObject2).map((c) => ({ id: num(c.ID), parentId: num(c.PARENT_ID), title: str(c.TITLE), done: c.IS_COMPLETE === "Y" }));
+  const notes = chatId === null ? ["\u0423 \u0437\u0430\u0434\u0430\u0447\u0438 \u043D\u0435\u0442 \u0447\u0430\u0442\u0430 \u2014 \u043E\u0431\u0441\u0443\u0436\u0434\u0435\u043D\u0438\u044F \u043D\u0435\u0442 \u0438\u043B\u0438 \u0437\u0430\u0434\u0430\u0447\u0430 \u0432 \u0441\u0442\u0430\u0440\u043E\u043C \u0444\u043E\u0440\u043C\u0430\u0442\u0435."] : [];
+  if (linkedDialogs.length > 0) notes.push("\u0412 \u043E\u043F\u0438\u0441\u0430\u043D\u0438\u0438 \u0435\u0441\u0442\u044C \u0441\u0441\u044B\u043B\u043A\u0438 \u043D\u0430 \u0434\u0440\u0443\u0433\u0438\u0435 \u0447\u0430\u0442\u044B (linkedDialogs) \u2014 \u0438\u0445 \u0442\u043E\u0436\u0435 \u043C\u043E\u0436\u043D\u043E \u043F\u0440\u043E\u0447\u0438\u0442\u0430\u0442\u044C.");
+  return envelope(
+    {
+      id: num(t.id) ?? id,
+      title: str(t.title),
+      status: statusName(t.status),
+      deadline: str(t.deadline) || null,
+      creator: person(t.creator),
+      responsible: person(t.responsible),
+      accomplices: asArray(t.accomplicesData).map(person).filter((p) => p !== null),
+      auditors: asArray(t.auditorsData).map(person).filter((p) => p !== null),
+      project: person(t.group),
+      description: description.text,
+      ...description.truncated ? { descriptionTruncated: true } : {},
+      dialogId: chatId === null ? null : `chat${chatId}`,
+      linkedDialogs,
+      checklist,
+      createdDate: str(t.createdDate) || null,
+      changedDate: str(t.changedDate) || null,
+      closedDate: str(t.closedDate) || null
+    },
+    null,
+    notes
+  );
+}
+
+// src/cli/register-projects-tasks.ts
+function registerProjectsTasks(program2, run) {
+  const projects = program2.command("projects").description("\u0413\u0440\u0443\u043F\u043F\u044B, \u043F\u0440\u043E\u0435\u043A\u0442\u044B, \u0441\u043A\u0440\u0430\u043C\u044B, \u043A\u043E\u043B\u043B\u0430\u0431\u044B");
+  projects.command("list").description("\u041D\u0430\u0439\u0442\u0438 \u0433\u0440\u0443\u043F\u043F\u0443 \u0438\u043B\u0438 \u043F\u0440\u043E\u0435\u043A\u0442; dialogId \u2014 \u0438\u0445 \u0447\u0430\u0442 \u0434\u043B\u044F chats messages").option("--search <\u0442\u0435\u043A\u0441\u0442>", "\u0447\u0430\u0441\u0442\u044C \u043D\u0430\u0437\u0432\u0430\u043D\u0438\u044F").option("--type <\u0442\u0438\u043F>", "group | project | scrum | collab").option("--mine", "\u0442\u043E\u043B\u044C\u043A\u043E \u0442\u0435, \u0433\u0434\u0435 \u044F \u0443\u0447\u0430\u0441\u0442\u043D\u0438\u043A").option("--limit <n>", "\u0441\u043A\u043E\u043B\u044C\u043A\u043E (\u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E 20, \u043C\u0430\u043A\u0441\u0438\u043C\u0443\u043C 50)").option("--page <\u043A\u0443\u0440\u0441\u043E\u0440>", "\u0437\u043D\u0430\u0447\u0435\u043D\u0438\u0435 next \u0438\u0437 \u043F\u0440\u043E\u0448\u043B\u043E\u0433\u043E \u043E\u0442\u0432\u0435\u0442\u0430").action((opts) => run((ctx) => projectsList(ctx, opts)));
+  projects.command("get").description("\u041A\u0430\u0440\u0442\u043E\u0447\u043A\u0430 \u0433\u0440\u0443\u043F\u043F\u044B \u0438 \u0443\u0447\u0430\u0441\u0442\u043D\u0438\u043A\u0438").argument("<id>", "\u043D\u043E\u043C\u0435\u0440 \u0433\u0440\u0443\u043F\u043F\u044B").action((id) => run((ctx) => projectsGet(ctx, id)));
+  const tasks = program2.command("tasks").description("\u0417\u0430\u0434\u0430\u0447\u0438 \u0438 \u0438\u0445 \u0447\u0430\u0442\u044B");
+  tasks.command("list").description("\u041C\u043E\u0438 \u0437\u0430\u0434\u0430\u0447\u0438 (\u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E \u2014 \u0433\u0434\u0435 \u044F \u043E\u0442\u0432\u0435\u0442\u0441\u0442\u0432\u0435\u043D\u043D\u044B\u0439, \u043F\u043E\u0441\u0442\u0430\u043D\u043E\u0432\u0449\u0438\u043A, \u0441\u043E\u0438\u0441\u043F\u043E\u043B\u043D\u0438\u0442\u0435\u043B\u044C \u0438\u043B\u0438 \u043D\u0430\u0431\u043B\u044E\u0434\u0430\u0442\u0435\u043B\u044C)").option("--role <\u0440\u043E\u043B\u044C>", "responsible | creator | accomplice | auditor | any (\u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E any)").option("--project <id>", "\u0442\u043E\u043B\u044C\u043A\u043E \u0437\u0430\u0434\u0430\u0447\u0438 \u0433\u0440\u0443\u043F\u043F\u044B").option("--status <\u0441\u0442\u0430\u0442\u0443\u0441>", "active | done | all (\u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E active)").option("--search <\u0442\u0435\u043A\u0441\u0442>", "\u0447\u0430\u0441\u0442\u044C \u043D\u0430\u0437\u0432\u0430\u043D\u0438\u044F").option("--limit <n>", "\u0441\u043A\u043E\u043B\u044C\u043A\u043E (\u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E 20, \u043C\u0430\u043A\u0441\u0438\u043C\u0443\u043C 50)").option("--page <\u043A\u0443\u0440\u0441\u043E\u0440>", "\u0437\u043D\u0430\u0447\u0435\u043D\u0438\u0435 next (\u0442\u043E\u043B\u044C\u043A\u043E \u0441 \u043E\u0434\u043D\u043E\u0439 \u0440\u043E\u043B\u044C\u044E)").action(
+    (opts) => run((ctx) => tasksList(ctx, opts))
+  );
+  tasks.command("get").description("\u041A\u0430\u0440\u0442\u043E\u0447\u043A\u0430 \u0437\u0430\u0434\u0430\u0447\u0438: dialogId \u0435\u0451 \u0447\u0430\u0442\u0430, \u0447\u0430\u0442\u044B \u0438\u0437 \u043E\u043F\u0438\u0441\u0430\u043D\u0438\u044F, \u0447\u0435\u043A-\u043B\u0438\u0441\u0442").argument("<id>", "\u043D\u043E\u043C\u0435\u0440 \u0437\u0430\u0434\u0430\u0447\u0438").option("--full", "\u043D\u0435 \u043E\u0431\u0440\u0435\u0437\u0430\u0442\u044C \u043E\u043F\u0438\u0441\u0430\u043D\u0438\u0435").action((id, opts) => run((ctx) => tasksGet(ctx, id, opts)));
+}
+
 // src/commands/update-check.ts
 var import_node_fs3 = __toESM(require("node:fs"), 1);
 var import_node_path3 = __toESM(require("node:path"), 1);
@@ -5229,19 +5512,19 @@ async function checkForUpdate(deps = {}) {
 
 // src/commands/status.ts
 var SECTION_SCOPES = {
-  chats: "im",
-  notifications: "im",
-  org: "im",
-  tasks: "task",
-  projects: "sonet_group",
-  disk: "disk",
-  mail: "mail",
-  calendar: "calendar",
-  meetings: "call",
-  feed: "log",
-  kb: "note",
-  worktime: "timeman",
-  users: "user_basic"
+  chats: ["im"],
+  notifications: ["im"],
+  org: ["im"],
+  tasks: ["task"],
+  projects: ["sonet_group", "socialnetwork"],
+  disk: ["disk"],
+  mail: ["mail"],
+  calendar: ["calendar"],
+  meetings: ["call"],
+  feed: ["log"],
+  kb: ["note"],
+  worktime: ["timeman"],
+  users: ["user_basic"]
 };
 var USER_SCOPES = ["user", "user_basic", "user_brief"];
 async function status(ctx, check = () => checkForUpdate()) {
@@ -5250,11 +5533,13 @@ async function status(ctx, check = () => checkForUpdate()) {
   const me = await ctx.client.call("user.current");
   const version = await check();
   const sections = {};
-  for (const [section, scope] of Object.entries(SECTION_SCOPES)) {
-    const ok = scope === "user_basic" ? USER_SCOPES.some((s) => granted.includes(s)) : granted.includes(scope);
-    sections[section] = ok ? "ok" : `\u043D\u0435\u0442 \u043F\u0440\u0430\u0432\u0430 ${scope}`;
+  for (const [section, scopes] of Object.entries(SECTION_SCOPES)) {
+    const lacking = scopes.filter(
+      (scope) => scope === "user_basic" ? !USER_SCOPES.some((s) => granted.includes(s)) : !granted.includes(scope)
+    );
+    sections[section] = lacking.length === 0 ? "ok" : `\u043D\u0435\u0442 \u043F\u0440\u0430\u0432\u0430 ${lacking.join(", ")}`;
   }
-  const needed = /* @__PURE__ */ new Set([...Object.values(SECTION_SCOPES), ...USER_SCOPES, "basic"]);
+  const needed = /* @__PURE__ */ new Set([...Object.values(SECTION_SCOPES).flat(), ...USER_SCOPES, "basic"]);
   const extra = granted.filter((s) => !needed.has(s));
   const notes = [];
   const missing = Object.entries(sections).filter(([, v]) => v !== "ok");
@@ -5332,6 +5617,7 @@ function buildProgram(run = runCommand) {
   ).version(APP_VERSION).helpCommand(false).exitOverride().configureOutput({ writeErr: () => void 0, outputError: () => void 0 });
   registerStatusUsers(program2, run);
   registerChats(program2, run);
+  registerProjectsTasks(program2, run);
   return program2;
 }
 var HELP_CODES = /* @__PURE__ */ new Set(["commander.helpDisplayed", "commander.help", "commander.version"]);

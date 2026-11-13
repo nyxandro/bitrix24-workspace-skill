@@ -18,6 +18,7 @@ describe('status', () => {
     expect(data.sections.chats).toBe('ok');
     expect(data.sections.disk).toBe('нет права disk');
     expect(data.sections.mail).toBe('нет права mail');
+    expect(data.sections.projects).toBe('нет права sonet_group, socialnetwork');
     expect(JSON.stringify(out)).not.toContain('testsecret0000');
   });
 
