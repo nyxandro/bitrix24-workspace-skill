@@ -3825,83 +3825,17 @@ var UPDATE_CHECK_URL = "https://raw.githubusercontent.com/nyxandro/bitrix24-work
 var UPDATE_CHECK_TTL_MS = 24 * 60 * 60 * 1e3;
 var UPDATE_CHECK_TIMEOUT_MS = 2500;
 var UPDATE_CHECK_CACHE_PATH = import_node_path.default.join(CONFIG_DIR, "update-check.json");
-
-// src/commands/update-check.ts
-var import_node_fs = __toESM(require("node:fs"), 1);
-var import_node_path2 = __toESM(require("node:path"), 1);
-function parseVersion(value) {
-  const normalized = value.trim().replace(/^v/i, "");
-  return /^\d+(\.\d+)*$/.test(normalized) ? normalized.split(".").map(Number) : null;
-}
-function isNewer(latest, current) {
-  const a = parseVersion(latest);
-  const b = parseVersion(current);
-  if (!a || !b) {
-    return false;
-  }
-  for (let i = 0; i < Math.max(a.length, b.length); i++) {
-    const x = a[i] ?? 0;
-    const y = b[i] ?? 0;
-    if (x !== y) {
-      return x > y;
-    }
-  }
-  return false;
-}
-function readCache(file) {
-  try {
-    const parsed = JSON.parse(import_node_fs.default.readFileSync(file, "utf8"));
-    return typeof parsed.checkedAt === "string" && typeof parsed.latestVersion === "string" ? { checkedAt: parsed.checkedAt, latestVersion: parsed.latestVersion } : null;
-  } catch {
-    return null;
-  }
-}
-function writeCache(file, cache) {
-  try {
-    import_node_fs.default.mkdirSync(import_node_path2.default.dirname(file), { recursive: true, mode: 448 });
-    import_node_fs.default.writeFileSync(file, JSON.stringify(cache), "utf8");
-  } catch {
-  }
-}
-async function fetchLatest(fetchFn) {
-  try {
-    const response = await fetchFn(UPDATE_CHECK_URL, { signal: AbortSignal.timeout(UPDATE_CHECK_TIMEOUT_MS) });
-    if (!response.ok) {
-      return null;
-    }
-    const pkg = await response.json();
-    return typeof pkg.version === "string" ? pkg.version : null;
-  } catch {
-    return null;
-  }
-}
-async function checkForUpdate(deps = {}) {
-  const now = deps.now ?? /* @__PURE__ */ new Date();
-  const file = deps.cachePath ?? UPDATE_CHECK_CACHE_PATH;
-  const cache = readCache(file);
-  const fresh = cache !== null && now.getTime() - Date.parse(cache.checkedAt) < UPDATE_CHECK_TTL_MS;
-  let latest;
-  if (fresh && cache) {
-    latest = cache.latestVersion;
-  } else {
-    latest = await fetchLatest(deps.fetchFn ?? fetch);
-    if (latest !== null) {
-      writeCache(file, { checkedAt: now.toISOString(), latestVersion: latest });
-    } else if (cache) {
-      latest = cache.latestVersion;
-    }
-  }
-  return { currentVersion: APP_VERSION, latestVersion: latest, updateAvailable: latest !== null && isNewer(latest, APP_VERSION) };
-}
+var MAX_TEXT_CHARS = 4e3;
+var MAX_MEMBERS = 50;
 
 // src/cli/runtime.ts
 var import_dotenv = __toESM(require_main(), 1);
-var import_node_fs3 = __toESM(require("node:fs"), 1);
+var import_node_fs2 = __toESM(require("node:fs"), 1);
 
 // src/api/client.ts
 var import_node_crypto = __toESM(require("node:crypto"), 1);
-var import_node_fs2 = __toESM(require("node:fs"), 1);
-var import_node_path3 = __toESM(require("node:path"), 1);
+var import_node_fs = __toESM(require("node:fs"), 1);
+var import_node_path2 = __toESM(require("node:path"), 1);
 
 // src/api/allowlist.ts
 var ALLOWED_V1 = /* @__PURE__ */ new Set([
@@ -4211,7 +4145,7 @@ function notAllowed(method) {
 }
 async function placeWithoutOverwrite(tmpPath, destPath, fail) {
   try {
-    await import_node_fs2.default.promises.link(tmpPath, destPath);
+    await import_node_fs.default.promises.link(tmpPath, destPath);
     return;
   } catch (err) {
     const code = err.code;
@@ -4223,7 +4157,7 @@ async function placeWithoutOverwrite(tmpPath, destPath, fail) {
     }
   }
   try {
-    await import_node_fs2.default.promises.copyFile(tmpPath, destPath, import_node_fs2.default.constants.COPYFILE_EXCL);
+    await import_node_fs.default.promises.copyFile(tmpPath, destPath, import_node_fs.default.constants.COPYFILE_EXCL);
   } catch (err) {
     throw fail(err.code === "EEXIST" ? "dest-exists" : "io", err);
   }
@@ -4301,7 +4235,7 @@ var B24Client = class {
     return body.result;
   }
   async download(url, destPath, expectedSize, maxBytes) {
-    const name = import_node_path3.default.basename(destPath);
+    const name = import_node_path2.default.basename(destPath);
     const fail = (reason, cause) => new AppError({
       code: "APP_B24_DOWNLOAD_FAILED",
       userMessage: `\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0441\u043A\u0430\u0447\u0430\u0442\u044C \u0444\u0430\u0439\u043B \xAB${name}\xBB. \u041F\u043E\u0432\u0442\u043E\u0440\u0438\u0442\u0435 \u043F\u043E\u0437\u0436\u0435.`,
@@ -4361,7 +4295,7 @@ var B24Client = class {
         void response.body.cancel().catch(() => void 0);
         throw fail("html-instead-of-file");
       }
-      handle = await import_node_fs2.default.promises.open(tmpPath, "wx");
+      handle = await import_node_fs.default.promises.open(tmpPath, "wx");
       const reader = response.body.getReader();
       let bytes = 0;
       for (; ; ) {
@@ -4378,16 +4312,16 @@ var B24Client = class {
       }
       await handle.close();
       handle = void 0;
-      const written = (await import_node_fs2.default.promises.stat(tmpPath)).size;
+      const written = (await import_node_fs.default.promises.stat(tmpPath)).size;
       if (bytes !== expectedSize || written !== expectedSize) {
         throw fail(`size-mismatch-${written}-of-${expectedSize}`);
       }
       await placeWithoutOverwrite(tmpPath, destPath, fail);
-      await import_node_fs2.default.promises.rm(tmpPath, { force: true });
+      await import_node_fs.default.promises.rm(tmpPath, { force: true });
       return { path: destPath, size: written };
     } catch (err) {
       await handle?.close().catch(() => void 0);
-      await import_node_fs2.default.promises.rm(tmpPath, { force: true }).catch(() => void 0);
+      await import_node_fs.default.promises.rm(tmpPath, { force: true }).catch(() => void 0);
       throw err instanceof AppError ? err : fail("io", err);
     }
   }
@@ -4515,8 +4449,123 @@ function parseWebhook(raw) {
 }
 
 // src/render/dates.ts
+var pad = (n, width = 2) => String(Math.abs(n)).padStart(width, "0");
+var HOUR_MS = 36e5;
+function zoneParts(epochMs, tz) {
+  const parts = new Intl.DateTimeFormat("en-US", {
+    timeZone: tz,
+    hourCycle: "h23",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit"
+  }).formatToParts(new Date(epochMs));
+  const get = (type) => Number(parts.find((p) => p.type === type)?.value);
+  return { y: get("year"), m: get("month"), d: get("day"), h: get("hour"), mi: get("minute"), s: get("second") };
+}
+function offsetMinutes(epochMs, tz) {
+  const p = zoneParts(epochMs, tz);
+  const asUtc = Date.UTC(p.y, p.m - 1, p.d, p.h, p.mi, p.s);
+  return Math.round((asUtc - Math.floor(epochMs / 1e3) * 1e3) / 6e4);
+}
+function formatOffset(minutes) {
+  const sign = minutes >= 0 ? "+" : "-";
+  return `${sign}${pad(Math.floor(Math.abs(minutes) / 60))}:${pad(Math.abs(minutes) % 60)}`;
+}
+function wall(y, m, d, h, mi, s) {
+  return `${pad(y, 4)}-${pad(m)}-${pad(d)}T${pad(h)}:${pad(mi)}:${pad(s)}`;
+}
+function formatInZone(epochMs, tz) {
+  const p = zoneParts(epochMs, tz);
+  return `${wall(p.y, p.m, p.d, p.h, p.mi, p.s)}${formatOffset(offsetMinutes(epochMs, tz))}`;
+}
+function localDateKey(epochMs, tz) {
+  const p = zoneParts(epochMs, tz);
+  return `${pad(p.y, 4)}-${pad(p.m)}-${pad(p.d)}`;
+}
+function wallTimeToEpoch(y, m, d, h, mi, s, tz) {
+  const guess = Date.UTC(y, m - 1, d, h, mi, s);
+  const offsets = new Set([-24, -12, 0, 12, 24].map((shift) => offsetMinutes(guess + shift * HOUR_MS, tz)));
+  const target = wall(y, m, d, h, mi, s);
+  const hits = [...offsets].map((off) => guess - off * 6e4).filter((epoch) => {
+    const p = zoneParts(epoch, tz);
+    return wall(p.y, p.m, p.d, p.h, p.mi, p.s) === target;
+  });
+  return hits.length > 0 ? Math.min(...hits) : null;
+}
+function startOfDay(y, m, d, tz) {
+  const exact = wallTimeToEpoch(y, m, d, 0, 0, 0, tz);
+  if (exact !== null) {
+    return exact;
+  }
+  const day = `${pad(y, 4)}-${pad(m)}-${pad(d)}`;
+  const guess = Date.UTC(y, m - 1, d);
+  let lo = guess - 14 * HOUR_MS;
+  let hi = guess + 14 * HOUR_MS;
+  while (hi - lo > 1e3) {
+    const mid = lo + Math.floor((hi - lo) / 2e3) * 1e3;
+    if (localDateKey(mid, tz) >= day) {
+      hi = mid;
+    } else {
+      lo = mid;
+    }
+  }
+  return hi;
+}
 function machineTimeZone() {
   return Intl.DateTimeFormat().resolvedOptions().timeZone;
+}
+function checkCalendarDay(y, m, d) {
+  const date = new Date(Date.UTC(y, m - 1, d));
+  return date.getUTCFullYear() === y && date.getUTCMonth() === m - 1 && date.getUTCDate() === d;
+}
+var DATE_ONLY_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
+var LOCAL_DATETIME_RE = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?$/;
+var ZONED_DATETIME_RE = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})$/;
+function invalidDate(option, raw) {
+  return new AppError({
+    code: "APP_CLI_INVALID_ARGUMENT",
+    userMessage: `\u041F\u0430\u0440\u0430\u043C\u0435\u0442\u0440 ${option}: \u043E\u0436\u0438\u0434\u0430\u0435\u0442\u0441\u044F \u0434\u0430\u0442\u0430 \u0413\u0413\u0413\u0413-\u041C\u041C-\u0414\u0414 \u0438\u043B\u0438 \u0434\u0430\u0442\u0430 \u0441\u043E \u0432\u0440\u0435\u043C\u0435\u043D\u0435\u043C \u0413\u0413\u0413\u0413-\u041C\u041C-\u0414\u0414T\u0447\u0447:\u043C\u043C, \u043F\u043E\u043B\u0443\u0447\u0435\u043D\u043E \xAB${raw}\xBB.`
+  });
+}
+function nextDay(y, m, d) {
+  const next = new Date(Date.UTC(y, m - 1, d + 1));
+  return [next.getUTCFullYear(), next.getUTCMonth() + 1, next.getUTCDate()];
+}
+function parseInputDate(raw, edge, option, tz = machineTimeZone()) {
+  const value = raw.trim();
+  const dateOnly = DATE_ONLY_RE.exec(value);
+  if (dateOnly) {
+    const [y, m, d] = [Number(dateOnly[1]), Number(dateOnly[2]), Number(dateOnly[3])];
+    if (!checkCalendarDay(y, m, d)) {
+      throw invalidDate(option, raw);
+    }
+    const epoch = edge === "start" ? startOfDay(y, m, d, tz) : startOfDay(...nextDay(y, m, d), tz) - 1e3;
+    return formatInZone(epoch, tz);
+  }
+  const local = LOCAL_DATETIME_RE.exec(value);
+  if (local) {
+    const [y, m, d, h, mi, s] = [1, 2, 3, 4, 5, 6].map((i) => Number(local[i] ?? 0));
+    if (!checkCalendarDay(y, m, d) || h > 23 || mi > 59 || s > 59) {
+      throw invalidDate(option, raw);
+    }
+    const epoch = wallTimeToEpoch(y, m, d, h, mi, s, tz);
+    if (epoch === null) {
+      throw invalidDate(option, raw);
+    }
+    return formatInZone(epoch, tz);
+  }
+  if (ZONED_DATETIME_RE.test(value)) {
+    const epoch = Date.parse(value);
+    const day = value.slice(0, 10).split("-").map(Number);
+    if (!Number.isFinite(epoch) || !checkCalendarDay(...day)) {
+      throw invalidDate(option, raw);
+    }
+    return formatInZone(epoch, tz);
+  }
+  throw invalidDate(option, raw);
 }
 
 // src/render/output.ts
@@ -4559,7 +4608,7 @@ function finalizeOutput(envelope2, secrets) {
 function bootstrapEnv(envPath = ENV_PATH, env = process.env) {
   let content;
   try {
-    content = import_node_fs3.default.readFileSync(envPath, "utf8");
+    content = import_node_fs2.default.readFileSync(envPath, "utf8");
   } catch (err) {
     if (err.code === "ENOENT") {
       return;
@@ -4647,6 +4696,122 @@ var runCommand = async (fn) => {
 `);
 };
 
+// src/render/dialog-id.ts
+var PRIVATE_TYPES = /* @__PURE__ */ new Set(["user", "private", "bot"]);
+function normalizeDialogId(raw, type) {
+  const value = String(raw).trim();
+  if (/^(?:chat|sg)\d+$/.test(value)) {
+    return value;
+  }
+  const user = /^user(\d+)$/.exec(value);
+  if (user) {
+    return user[1];
+  }
+  if (/^\d+$/.test(value) && type !== void 0) {
+    return PRIVATE_TYPES.has(type) ? value : `chat${value}`;
+  }
+  throw new AppError({
+    code: "APP_B24_UNEXPECTED_RESPONSE",
+    userMessage: "\u0411\u0438\u0442\u0440\u0438\u043A\u044124 \u0432\u0435\u0440\u043D\u0443\u043B \u0434\u0430\u043D\u043D\u044B\u0435 \u0432 \u043D\u0435\u043E\u0436\u0438\u0434\u0430\u043D\u043D\u043E\u043C \u0432\u0438\u0434\u0435 \u2014 \u043A\u043E\u043C\u0430\u043D\u0434\u0430 \u043D\u0435 \u043C\u043E\u0436\u0435\u0442 \u0438\u0445 \u0440\u0430\u0437\u043E\u0431\u0440\u0430\u0442\u044C.",
+    details: { field: "dialogId", type }
+  });
+}
+function parseDialogIdArg(raw) {
+  const value = raw.trim();
+  if (/^(?:chat|sg)\d+$/.test(value) || /^\d+$/.test(value)) {
+    return value;
+  }
+  throw new AppError({
+    code: "APP_CLI_INVALID_ARGUMENT",
+    userMessage: `\u041F\u0430\u0440\u0430\u043C\u0435\u0442\u0440 dialogId: \u043E\u0436\u0438\u0434\u0430\u0435\u0442\u0441\u044F chat<\u043D\u043E\u043C\u0435\u0440>, sg<\u043D\u043E\u043C\u0435\u0440 \u043F\u0440\u043E\u0435\u043A\u0442\u0430> \u0438\u043B\u0438 \u043D\u043E\u043C\u0435\u0440 \u0441\u043E\u0442\u0440\u0443\u0434\u043D\u0438\u043A\u0430 \u0434\u043B\u044F \u043B\u0438\u0447\u043A\u0438, \u043F\u043E\u043B\u0443\u0447\u0435\u043D\u043E \xAB${raw}\xBB.`
+  });
+}
+
+// src/render/text.ts
+var KNOWN_TAGS = [
+  "B",
+  "I",
+  "U",
+  "S",
+  "COLOR",
+  "SIZE",
+  "FONT",
+  "ICON",
+  "LEFT",
+  "RIGHT",
+  "CENTER",
+  "JUSTIFY",
+  "IMG",
+  "VIDEO",
+  "SPOILER",
+  "P",
+  "HR",
+  "PCH",
+  "ATTACH",
+  "DISK",
+  "CONTEXT",
+  "SEND",
+  "PUT",
+  "CALL",
+  "CHAT",
+  "LIKE",
+  "DATE",
+  "BOT"
+];
+var KNOWN_TAG_RE = new RegExp(`\\[\\/?(?:${KNOWN_TAGS.join("|")})(?:=[^\\]]*)?(?:\\s[^\\]]*)?\\]`, "gi");
+var ENTITIES = {
+  "&amp;": "&",
+  "&lt;": "<",
+  "&gt;": ">",
+  "&quot;": '"',
+  "&#39;": "'",
+  "&#039;": "'",
+  "&nbsp;": " "
+};
+var CODE_BLOCK_RE = /\[CODE\]([\s\S]*?)\[\/CODE\]/gi;
+var SYSTEM_CODES = /* @__PURE__ */ new Set(["CHAT_JOIN", "CHAT_LEAVE", "CHAT_CREATE", "CHAT_RENAME", "CHAT_AVATAR"]);
+function flattenListsAndTables(text) {
+  return text.replace(/\[LIST(?:=[^\]]*)?\]\s*/gi, "").replace(/\s*\[\/LIST\]/gi, "").replace(/\s*\[\*\]\s*/g, "\n- ").replace(/\[\/T[DH]\]\s*\[T[DH](?:=[^\]]*)?\]/gi, " | ").replace(/\[\/?T[DH](?:=[^\]]*)?\]/gi, "").replace(/\s*\[\/TR\]\s*\[TR\]\s*/gi, "\n").replace(/\[\/?(?:TR|TABLE)\]/gi, "").replace(/^\n+/, "");
+}
+function bbToText(raw, users = /* @__PURE__ */ new Map(), tz = machineTimeZone()) {
+  const codeBlocks = [];
+  let text = raw.replace(CODE_BLOCK_RE, (_m, body) => {
+    codeBlocks.push(body);
+    return `\uE000${codeBlocks.length - 1}\uE000`;
+  });
+  text = text.replace(/\[br\]/gi, "\n");
+  text = text.replace(/\[TIMESTAMP=(\d+)(?:\s[^\]]*)?\]/gi, (_m, ts) => formatInZone(Number(ts) * 1e3, tz));
+  text = flattenListsAndTables(text);
+  text = text.replace(/\[USER=(\d+)(?:\s+REPLACE)?\]([\s\S]*?)\[\/USER\]/gi, (_m, id, name) => {
+    const shown = name.trim() !== "" ? name.trim() : users.get(Number(id)) ?? `\u0441\u043E\u0442\u0440\u0443\u0434\u043D\u0438\u043A ${id}`;
+    return `@${shown}`;
+  });
+  text = text.replace(/\[URL=([^\]]+)\]([\s\S]*?)\[\/URL\]/gi, (_m, href, label) => {
+    const l = label.trim();
+    return l === "" || l === href ? href : `${l} (${href})`;
+  });
+  text = text.replace(/\[URL\]([\s\S]*?)\[\/URL\]/gi, (_m, href) => href.trim());
+  text = text.replace(
+    /\[QUOTE\]([\s\S]*?)\[\/QUOTE\]\n?/gi,
+    (_m, body) => body.trim().split("\n").map((line) => `> ${line}`).join("\n").concat("\n")
+  );
+  text = text.replace(KNOWN_TAG_RE, "");
+  text = text.replace(/\[\/?(?:USER|URL|QUOTE)(?:=[^\]]*)?(?:\s[^\]]*)?\]/gi, "");
+  text = text.replace(/&(?:amp|lt|gt|quot|nbsp|#0?39);/g, (entity) => ENTITIES[entity] ?? entity);
+  text = text.replace(/\uE000(\d+)\uE000/g, (match, i) => codeBlocks[Number(i)] ?? match);
+  return text.replace(/\n$/, "");
+}
+function isSystemMessage(msg) {
+  return msg.authorId === 0 || msg.code !== void 0 && SYSTEM_CODES.has(msg.code);
+}
+function truncate(text, max) {
+  const chars = Array.from(text);
+  if (chars.length <= max) {
+    return { text, truncated: false };
+  }
+  return { text: chars.slice(0, max).join(""), truncated: true };
+}
+
 // src/commands/common.ts
 function envelope(data, next = null, notes = []) {
   return { data, next, notes };
@@ -4670,6 +4835,24 @@ function num(value) {
 function parseLimit(raw, def, max, option = "--limit") {
   return raw === void 0 ? def : parsePositiveInt(raw, option, max);
 }
+function encodeCursor(value) {
+  return Buffer.from(JSON.stringify(value), "utf8").toString("base64url");
+}
+function decodeCursor(raw, option, check) {
+  let parsed;
+  try {
+    parsed = JSON.parse(Buffer.from(raw.trim(), "base64url").toString("utf8"));
+  } catch {
+    parsed = void 0;
+  }
+  if (!check(parsed)) {
+    throw new AppError({
+      code: "APP_CLI_INVALID_ARGUMENT",
+      userMessage: `\u041F\u0430\u0440\u0430\u043C\u0435\u0442\u0440 ${option}: \u043A\u0443\u0440\u0441\u043E\u0440 \u043D\u0435 \u0440\u0430\u0441\u043F\u043E\u0437\u043D\u0430\u043D. \u041F\u0435\u0440\u0435\u0434\u0430\u0439\u0442\u0435 \u0437\u043D\u0430\u0447\u0435\u043D\u0438\u0435 \u043F\u043E\u043B\u044F next \u0438\u0437 \u043F\u0440\u0435\u0434\u044B\u0434\u0443\u0449\u0435\u0433\u043E \u043E\u0442\u0432\u0435\u0442\u0430 \u043A\u0430\u043A \u0435\u0441\u0442\u044C.`
+    });
+  }
+  return parsed;
+}
 function personName(raw) {
   const full = str(raw.name ?? raw.NAME_FORMATTED ?? raw.FULL_NAME).trim();
   if (full !== "" && raw.NAME === void 0) {
@@ -4679,6 +4862,369 @@ function personName(raw) {
   const last = str(raw.LAST_NAME ?? raw.last_name ?? raw.lastName).trim();
   const joined = `${first} ${last}`.trim();
   return joined !== "" ? joined : full;
+}
+function peopleMap(users) {
+  const map = /* @__PURE__ */ new Map();
+  for (const item of asArray(users)) {
+    if (isObject2(item)) {
+      const id = num(item.id ?? item.ID);
+      if (id !== null) {
+        map.set(id, personName(item));
+      }
+    }
+  }
+  return map;
+}
+function unexpected2(field) {
+  return new AppError({
+    code: "APP_B24_UNEXPECTED_RESPONSE",
+    userMessage: "\u0411\u0438\u0442\u0440\u0438\u043A\u044124 \u0432\u0435\u0440\u043D\u0443\u043B \u0434\u0430\u043D\u043D\u044B\u0435 \u0432 \u043D\u0435\u043E\u0436\u0438\u0434\u0430\u043D\u043D\u043E\u043C \u0432\u0438\u0434\u0435 \u2014 \u043A\u043E\u043C\u0430\u043D\u0434\u0430 \u043D\u0435 \u043C\u043E\u0436\u0435\u0442 \u0438\u0445 \u0440\u0430\u0437\u043E\u0431\u0440\u0430\u0442\u044C.",
+    details: { field }
+  });
+}
+
+// src/commands/messages.ts
+function toMessages(result, tz, full) {
+  const users = peopleMap(result.users);
+  const files = /* @__PURE__ */ new Map();
+  for (const f of asArray(result.files).filter(isObject2)) {
+    const id = num(f.id);
+    if (id !== null) {
+      files.set(id, { fileId: id, name: str(f.name), size: num(f.size), type: str(f.type) });
+    }
+  }
+  const out = [];
+  for (const m of asArray(result.messages).filter(isObject2)) {
+    const id = num(m.id);
+    if (id === null) {
+      continue;
+    }
+    const authorId = num(m.author_id ?? m.authorId) ?? 0;
+    const params = isObject2(m.params) ? m.params : {};
+    const code = str(params.CODE) || void 0;
+    const system = m.isSystem === true || isSystemMessage({ authorId, code });
+    const text = bbToText(str(m.text), users, tz);
+    const cut = full ? { text, truncated: false } : truncate(text, MAX_TEXT_CHARS);
+    const fileIds = asArray(params.FILE_ID ?? m.files).map((f) => num(isObject2(f) ? f.id : f)).filter((f) => f !== null);
+    out.push({
+      id,
+      date: str(m.date),
+      author: authorId === 0 ? { id: 0, name: "\u0441\u0438\u0441\u0442\u0435\u043C\u0430" } : { id: authorId, name: users.get(authorId) ?? `\u0441\u043E\u0442\u0440\u0443\u0434\u043D\u0438\u043A ${authorId}` },
+      text: cut.text,
+      ...cut.truncated ? { truncated: true } : {},
+      system,
+      files: fileIds.map((fid) => files.get(fid) ?? { fileId: fid })
+    });
+  }
+  return out;
+}
+
+// src/commands/chats.ts
+var PAGE = 50;
+var SINCE_CAP = 500;
+var LAST_MESSAGE_PREVIEW = 300;
+function invalid2(message) {
+  return new AppError({ code: "APP_CLI_INVALID_ARGUMENT", userMessage: message });
+}
+function entityOf(chat) {
+  if (!isObject2(chat) || str(chat.entity_type) === "") {
+    return null;
+  }
+  return { type: str(chat.entity_type), id: str(chat.entity_id) };
+}
+var isOffsetCursor = (v) => isObject2(v) && typeof v.o === "number" && Number.isSafeInteger(v.o) && v.o >= 0;
+async function chatsRecent(ctx, opts) {
+  const limit = parseLimit(opts.limit, 20, 50);
+  const offset = opts.page ? decodeCursor(opts.page, "--page", isOffsetCursor).o : 0;
+  const type = opts.type ?? "all";
+  if (!["all", "private", "chat"].includes(type)) {
+    throw invalid2(`\u041F\u0430\u0440\u0430\u043C\u0435\u0442\u0440 --type: \u043E\u0436\u0438\u0434\u0430\u0435\u0442\u0441\u044F private, chat \u0438\u043B\u0438 all, \u043F\u043E\u043B\u0443\u0447\u0435\u043D\u043E \xAB${type}\xBB.`);
+  }
+  const params = { SKIP_OPENLINES: "Y", LIMIT: limit, OFFSET: offset };
+  if (type === "private") params.SKIP_CHAT = "Y";
+  if (type === "chat") params.SKIP_DIALOG = "Y";
+  if (opts.unread) params.UNREAD_ONLY = "Y";
+  const resp = await ctx.client.call("im.recent.list", params);
+  if (!isObject2(resp.result)) {
+    throw unexpected2("im.recent.list.result");
+  }
+  const seen = /* @__PURE__ */ new Set();
+  const data = [];
+  for (const it of asArray(resp.result.items).filter(isObject2)) {
+    const dialogId = normalizeDialogId(str(it.id), str(it.type));
+    const unreadCount = num(it.counter) ?? 0;
+    if (seen.has(dialogId) || opts.unread && unreadCount === 0) {
+      continue;
+    }
+    seen.add(dialogId);
+    const message = isObject2(it.message) ? it.message : null;
+    data.push({
+      dialogId,
+      title: str(it.title),
+      type: isObject2(it.chat) && str(it.chat.type) !== "" ? str(it.chat.type) : str(it.type),
+      entity: entityOf(it.chat),
+      unreadCount,
+      markedUnread: it.unread === true,
+      lastMessage: message ? { text: truncate(bbToText(str(message.text), /* @__PURE__ */ new Map(), ctx.tz), LAST_MESSAGE_PREVIEW).text, date: str(message.date), authorId: num(message.author_id) } : null,
+      date: str(it.date_update ?? it.date_last_activity)
+    });
+  }
+  const hasMore = resp.result.hasMore === true || resp.result.hasMorePages === true;
+  const notes = data.length === 0 ? ["\u041D\u0438\u0447\u0435\u0433\u043E \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u043E \u043D\u0430 \u044D\u0442\u043E\u0439 \u0441\u0442\u0440\u0430\u043D\u0438\u0446\u0435."] : [];
+  if (hasMore) notes.push("\u0415\u0441\u0442\u044C \u0435\u0449\u0451 \u0434\u0438\u0430\u043B\u043E\u0433\u0438: --page <next>.");
+  return envelope(data, hasMore ? encodeCursor({ o: offset + limit }) : null, notes);
+}
+async function chatsCounters(ctx) {
+  const resp = await ctx.client.call("im.counters.get");
+  const type = isObject2(resp.result) && isObject2(resp.result.TYPE) ? resp.result.TYPE : null;
+  if (!type) {
+    throw unexpected2("im.counters.get.TYPE");
+  }
+  const byType = Object.fromEntries(Object.entries(type).filter(([, v]) => typeof v === "number"));
+  return envelope({ total: num(type.ALL), byType });
+}
+async function chatsFind(ctx, text, limitRaw) {
+  const limit = parseLimit(limitRaw, 10, 50);
+  if (text.trim().length < 2) {
+    throw invalid2("\u041F\u0430\u0440\u0430\u043C\u0435\u0442\u0440 \u0442\u0435\u043A\u0441\u0442: \u043D\u0443\u0436\u043D\u043E \u043D\u0435 \u043C\u0435\u043D\u044C\u0448\u0435 2 \u0441\u0438\u043C\u0432\u043E\u043B\u043E\u0432.");
+  }
+  const resp = await ctx.client.call("im.search.chat.list", { FIND: text.trim(), LIMIT: limit });
+  const data = asArray(resp.result).filter(isObject2).map((c) => ({ dialogId: `chat${num(c.id)}`, title: str(c.name), type: str(c.type), entity: entityOf(c), messageCount: num(c.message_count) }));
+  const notes = data.length === 0 ? ["\u0427\u0430\u0442\u044B \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u044B. \u0427\u0430\u0442\u044B \u0437\u0430\u0434\u0430\u0447 \u0442\u0430\u043A \u043D\u0435 \u0438\u0449\u0443\u0442\u0441\u044F \u2014 \u0434\u043B\u044F \u043D\u0438\u0445 tasks get."] : [];
+  return envelope(data, null, notes);
+}
+async function chatsInfo(ctx, dialogArg) {
+  const dialogId = parseDialogIdArg(dialogArg);
+  const d = await ctx.client.call("im.dialog.get", { DIALOG_ID: dialogId });
+  if (!isObject2(d.result)) {
+    throw unexpected2("im.dialog.get.result");
+  }
+  const users = await ctx.client.call("im.dialog.users.list", { DIALOG_ID: dialogId, LIMIT: MAX_MEMBERS });
+  const members = asArray(users.result).filter(isObject2).slice(0, MAX_MEMBERS).map((u) => ({ id: num(u.id), name: personName(u), position: str(u.work_position) }));
+  const total = Math.max(num(d.result.user_counter) ?? 0, users.total ?? 0, members.length);
+  return envelope(
+    {
+      dialogId,
+      title: str(d.result.name),
+      type: str(d.result.type),
+      ownerId: num(d.result.owner),
+      entity: entityOf(d.result),
+      messageCount: num(d.result.message_count),
+      lastMessageId: num(d.result.last_message_id),
+      members,
+      membersTotal: total
+    },
+    null,
+    total > members.length ? [`\u041F\u043E\u043A\u0430\u0437\u0430\u043D\u044B \u043F\u0435\u0440\u0432\u044B\u0435 ${members.length} \u0443\u0447\u0430\u0441\u0442\u043D\u0438\u043A\u043E\u0432 \u0438\u0437 ${total}.`] : []
+  );
+}
+async function readForward(ctx, dialogId, after, limit, full) {
+  const collected = [];
+  let cursor = after;
+  let hasMore = false;
+  while (collected.length < limit) {
+    const want = Math.min(PAGE, limit - collected.length);
+    const page = await ctx.client.call("im.dialog.messages.get", { DIALOG_ID: dialogId, FIRST_ID: cursor, LIMIT: want });
+    const msgs = toMessages(isObject2(page.result) ? page.result : {}, ctx.tz, full).filter((m) => m.id > cursor);
+    if (msgs.length === 0) break;
+    collected.push(...msgs);
+    const maxId = Math.max(...msgs.map((m) => m.id));
+    hasMore = msgs.length >= want;
+    if (maxId <= cursor) break;
+    cursor = maxId;
+    if (!hasMore) break;
+  }
+  const sorted = collected.sort((a, b) => a.id - b.id).slice(0, limit);
+  const next = hasMore && sorted.length > 0 ? String(sorted[sorted.length - 1].id) : null;
+  return envelope(sorted, next, next ? ["\u0415\u0441\u0442\u044C \u0431\u043E\u043B\u0435\u0435 \u043D\u043E\u0432\u044B\u0435 \u0441\u043E\u043E\u0431\u0449\u0435\u043D\u0438\u044F: --after <next>."] : []);
+}
+async function chatsMessages(ctx, dialogArg, opts) {
+  const dialogId = parseDialogIdArg(dialogArg);
+  const limit = parseLimit(opts.limit, 30, 200);
+  if (opts.before && opts.after) {
+    throw invalid2("\u041F\u0430\u0440\u0430\u043C\u0435\u0442\u0440\u044B --before \u0438 --after \u0432\u043C\u0435\u0441\u0442\u0435 \u043D\u0435 \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u044E\u0442\u0441\u044F: \u0432\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u043E\u0434\u043D\u043E \u043D\u0430\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u0438\u0435.");
+  }
+  const full = opts.full === true;
+  if (opts.after) {
+    return readForward(ctx, dialogId, parsePositiveInt(opts.after, "--after"), limit, full);
+  }
+  const since = opts.since ? Date.parse(parseInputDate(opts.since, "start", "--since", ctx.tz)) : null;
+  let cursor;
+  if (opts.before) {
+    cursor = parsePositiveInt(opts.before, "--before");
+  } else {
+    const d = await ctx.client.call("im.dialog.get", { DIALOG_ID: dialogId });
+    const last = isObject2(d.result) ? num(d.result.last_message_id) : null;
+    if (last === null) throw unexpected2("im.dialog.get.last_message_id");
+    cursor = last + 1;
+  }
+  const target = since !== null ? SINCE_CAP : limit;
+  const collected = /* @__PURE__ */ new Map();
+  let hasMore = false;
+  let reachedSince = false;
+  while (collected.size < target) {
+    const want = Math.min(PAGE, target - collected.size);
+    const page = await ctx.client.call("im.dialog.messages.get", { DIALOG_ID: dialogId, LAST_ID: cursor, LIMIT: want });
+    const msgs = toMessages(isObject2(page.result) ? page.result : {}, ctx.tz, full).filter((m) => m.id < cursor);
+    if (msgs.length === 0) {
+      hasMore = false;
+      break;
+    }
+    for (const m of msgs) {
+      if (since !== null && Date.parse(m.date) < since) {
+        reachedSince = true;
+      } else {
+        collected.set(m.id, m);
+      }
+    }
+    hasMore = msgs.length >= want;
+    cursor = Math.min(...msgs.map((m) => m.id));
+    if (reachedSince || !hasMore) break;
+  }
+  const kept = [...collected.values()].sort((a, b) => b.id - a.id).slice(0, target);
+  const more = !reachedSince && (hasMore || collected.size > kept.length) && kept.length > 0;
+  const next = more ? String(kept[kept.length - 1].id) : null;
+  const notes = [];
+  if (kept.length === 0) notes.push("\u0421\u043E\u043E\u0431\u0449\u0435\u043D\u0438\u0439 \u043D\u0435\u0442 \u0437\u0430 \u044D\u0442\u043E\u0442 \u043F\u0435\u0440\u0438\u043E\u0434.");
+  if (next && since !== null) notes.push(`\u041F\u043E\u043A\u0430\u0437\u0430\u043D\u044B \u043F\u043E\u0441\u043B\u0435\u0434\u043D\u0438\u0435 ${SINCE_CAP} \u0441\u043E\u043E\u0431\u0449\u0435\u043D\u0438\u0439 \u0441 \u0443\u043A\u0430\u0437\u0430\u043D\u043D\u043E\u0439 \u0434\u0430\u0442\u044B; \u0431\u043E\u043B\u0435\u0435 \u0440\u0430\u043D\u043D\u0438\u0435 \u2014 --before <next>.`);
+  else if (next) notes.push("\u0415\u0441\u0442\u044C \u0431\u043E\u043B\u0435\u0435 \u0440\u0430\u043D\u043D\u0438\u0435 \u0441\u043E\u043E\u0431\u0449\u0435\u043D\u0438\u044F: --before <next>.");
+  return envelope(kept.reverse(), next, notes);
+}
+async function chatsSearch(ctx, dialogArg, text, opts) {
+  const dialogId = parseDialogIdArg(dialogArg);
+  const limit = parseLimit(opts.limit, 30, 200);
+  if (text.trim().length <= 2) {
+    throw invalid2("\u041F\u0430\u0440\u0430\u043C\u0435\u0442\u0440 \u0442\u0435\u043A\u0441\u0442: \u043D\u0443\u0436\u043D\u043E \u0431\u043E\u043B\u044C\u0448\u0435 2 \u0441\u0438\u043C\u0432\u043E\u043B\u043E\u0432.");
+  }
+  const d = await ctx.client.call("im.dialog.get", { DIALOG_ID: dialogId });
+  const chatId = isObject2(d.result) ? num(d.result.id) : null;
+  if (chatId === null) throw unexpected2("im.dialog.get.id");
+  const params = { CHAT_ID: chatId, SEARCH_MESSAGE: text.trim(), LIMIT: limit, ORDER: { ID: "DESC" } };
+  if (opts.since) params.DATE_FROM = parseInputDate(opts.since, "start", "--since", ctx.tz);
+  if (opts.until) params.DATE_TO = parseInputDate(opts.until, "end", "--until", ctx.tz);
+  if (opts.before) params.LAST_ID = parsePositiveInt(opts.before, "--before");
+  const resp = await ctx.client.call("im.dialog.messages.search", params);
+  const msgs = toMessages(isObject2(resp.result) ? resp.result : {}, ctx.tz, false).sort((a, b) => a.id - b.id);
+  const next = msgs.length >= limit ? String(msgs[0].id) : null;
+  const notes = msgs.length === 0 ? ["\u041D\u0438\u0447\u0435\u0433\u043E \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u043E."] : next ? ["\u0415\u0441\u0442\u044C \u0435\u0449\u0451 \u0441\u043E\u0432\u043F\u0430\u0434\u0435\u043D\u0438\u044F: --before <next>."] : [];
+  return envelope(msgs, next, notes);
+}
+
+// src/commands/notifications.ts
+var isNotifyCursor = (v) => isObject2(v) && typeof v.id === "number" && Number.isSafeInteger(v.id) && (v.t === 1 || v.t === 3);
+async function notifications(ctx, opts) {
+  const limit = parseLimit(opts.limit, 20, 50);
+  const params = { LIMIT: limit };
+  if (opts.before) {
+    const c = decodeCursor(opts.before, "--before", isNotifyCursor);
+    params.LAST_ID = c.id;
+    params.LAST_TYPE = c.t;
+  }
+  const resp = await ctx.client.call("im.notify.get", params);
+  const result = isObject2(resp.result) ? resp.result : {};
+  const users = peopleMap(result.users);
+  const items = asArray(result.notifications).filter(isObject2);
+  const data = items.map((n) => {
+    const authorId = num(n.author_id) ?? 0;
+    return {
+      id: num(n.id),
+      date: str(n.date),
+      from: authorId === 0 ? null : { id: authorId, name: users.get(authorId) ?? `\u0441\u043E\u0442\u0440\u0443\u0434\u043D\u0438\u043A ${authorId}` },
+      title: str(n.notify_title),
+      text: truncate(bbToText(str(n.text), users, ctx.tz), MAX_TEXT_CHARS).text,
+      module: str(n.notify_module),
+      read: n.notify_read === "Y" || n.notify_read === true
+    };
+  });
+  const last = items[items.length - 1];
+  const next = items.length >= limit && last ? encodeCursor({ id: num(last.id), t: num(last.notify_type) === 1 ? 1 : 3 }) : null;
+  const notes = data.length === 0 ? ["\u0423\u0432\u0435\u0434\u043E\u043C\u043B\u0435\u043D\u0438\u0439 \u043D\u0435\u0442."] : next ? ["\u0415\u0441\u0442\u044C \u0431\u043E\u043B\u0435\u0435 \u0440\u0430\u043D\u043D\u0438\u0435 \u0443\u0432\u0435\u0434\u043E\u043C\u043B\u0435\u043D\u0438\u044F: --before <next>."] : [];
+  return envelope(data, next, notes);
+}
+
+// src/cli/register-chats.ts
+var DIALOG_HELP = "chat<\u043D\u043E\u043C\u0435\u0440> \u2014 \u0433\u0440\u0443\u043F\u043F\u043E\u0432\u043E\u0439 \u0447\u0430\u0442 \u0438\u043B\u0438 \u0447\u0430\u0442 \u0437\u0430\u0434\u0430\u0447\u0438, sg<\u043D\u043E\u043C\u0435\u0440> \u2014 \u0447\u0430\u0442 \u043F\u0440\u043E\u0435\u043A\u0442\u0430, \u043D\u043E\u043C\u0435\u0440 \u2014 \u043B\u0438\u0447\u043A\u0430 \u0441 \u0441\u043E\u0442\u0440\u0443\u0434\u043D\u0438\u043A\u043E\u043C";
+function registerChats(program2, run) {
+  const chats = program2.command("chats").description("\u0427\u0430\u0442\u044B, \u043B\u0438\u0447\u043A\u0430, \u0447\u0430\u0442\u044B \u0437\u0430\u0434\u0430\u0447 \u0438 \u043F\u0440\u043E\u0435\u043A\u0442\u043E\u0432");
+  chats.command("recent").description("\u041F\u043E\u0441\u043B\u0435\u0434\u043D\u0438\u0435 \u0434\u0438\u0430\u043B\u043E\u0433\u0438 \u0441\u043E \u0441\u0447\u0451\u0442\u0447\u0438\u043A\u0430\u043C\u0438 \u043D\u0435\u043F\u0440\u043E\u0447\u0438\u0442\u0430\u043D\u043D\u043E\u0433\u043E").option("--unread", "\u0442\u043E\u043B\u044C\u043A\u043E \u0441 \u043D\u0435\u043F\u0440\u043E\u0447\u0438\u0442\u0430\u043D\u043D\u044B\u043C\u0438").option("--type <\u0442\u0438\u043F>", "private | chat | all (\u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E all)").option("--limit <n>", "\u0441\u043A\u043E\u043B\u044C\u043A\u043E (\u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E 20, \u043C\u0430\u043A\u0441\u0438\u043C\u0443\u043C 50)").option("--page <\u043A\u0443\u0440\u0441\u043E\u0440>", "\u0437\u043D\u0430\u0447\u0435\u043D\u0438\u0435 next \u0438\u0437 \u043F\u0440\u043E\u0448\u043B\u043E\u0433\u043E \u043E\u0442\u0432\u0435\u0442\u0430").action((opts) => run((ctx) => chatsRecent(ctx, opts)));
+  chats.command("counters").description("\u0421\u0432\u043E\u0434\u043A\u0430 \u043D\u0435\u043F\u0440\u043E\u0447\u0438\u0442\u0430\u043D\u043D\u043E\u0433\u043E \u043F\u043E \u0442\u0438\u043F\u0430\u043C").action(() => run((ctx) => chatsCounters(ctx)));
+  chats.command("find").description("\u041D\u0430\u0439\u0442\u0438 \u0447\u0430\u0442 \u043F\u043E \u043D\u0430\u0437\u0432\u0430\u043D\u0438\u044E \u0438\u043B\u0438 \u0443\u0447\u0430\u0441\u0442\u043D\u0438\u043A\u0443 (\u0447\u0430\u0442\u044B \u0437\u0430\u0434\u0430\u0447 \u0442\u0430\u043A \u043D\u0435 \u043D\u0430\u0445\u043E\u0434\u044F\u0442\u0441\u044F \u2014 \u0434\u043B\u044F \u043D\u0438\u0445 tasks get)").argument("<\u0442\u0435\u043A\u0441\u0442>", "\u043D\u0435 \u043C\u0435\u043D\u044C\u0448\u0435 2 \u0441\u0438\u043C\u0432\u043E\u043B\u043E\u0432").option("--limit <n>", "\u0441\u043A\u043E\u043B\u044C\u043A\u043E (\u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E 10, \u043C\u0430\u043A\u0441\u0438\u043C\u0443\u043C 50)").action((text, opts) => run((ctx) => chatsFind(ctx, text, opts.limit)));
+  chats.command("info").description("\u0427\u0442\u043E \u0437\u0430 \u0447\u0430\u0442 \u0438 \u043A\u0442\u043E \u0432 \u043D\u0451\u043C").argument("<dialogId>", DIALOG_HELP).action((dialogId) => run((ctx) => chatsInfo(ctx, dialogId)));
+  chats.command("messages").description("\u041F\u0440\u043E\u0447\u0438\u0442\u0430\u0442\u044C \u043F\u0435\u0440\u0435\u043F\u0438\u0441\u043A\u0443: \u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E \u043F\u043E\u0441\u043B\u0435\u0434\u043D\u0438\u0435 \u0441\u043E\u043E\u0431\u0449\u0435\u043D\u0438\u044F, \u043F\u043E \u0432\u043E\u0437\u0440\u0430\u0441\u0442\u0430\u043D\u0438\u044E \u0432\u0440\u0435\u043C\u0435\u043D\u0438").argument("<dialogId>", DIALOG_HELP).option("--limit <n>", "\u0441\u043A\u043E\u043B\u044C\u043A\u043E (\u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E 30, \u043C\u0430\u043A\u0441\u0438\u043C\u0443\u043C 200)").option("--before <id>", "\u0431\u043E\u043B\u0435\u0435 \u0440\u0430\u043D\u043D\u0438\u0435, \u0447\u0435\u043C \u044D\u0442\u043E \u0441\u043E\u043E\u0431\u0449\u0435\u043D\u0438\u0435 (\u0437\u043D\u0430\u0447\u0435\u043D\u0438\u0435 next)").option("--after <id>", "\u0431\u043E\u043B\u0435\u0435 \u043D\u043E\u0432\u044B\u0435, \u0447\u0435\u043C \u044D\u0442\u043E \u0441\u043E\u043E\u0431\u0449\u0435\u043D\u0438\u0435").option("--since <\u0434\u0430\u0442\u0430>", "\u0432\u0441\u0435 \u0441\u043E\u043E\u0431\u0449\u0435\u043D\u0438\u044F \u0441 \u0434\u0430\u0442\u044B \u0413\u0413\u0413\u0413-\u041C\u041C-\u0414\u0414 (\u043D\u0435 \u0431\u043E\u043B\u044C\u0448\u0435 500)").option("--full", "\u043D\u0435 \u043E\u0431\u0440\u0435\u0437\u0430\u0442\u044C \u0434\u043B\u0438\u043D\u043D\u044B\u0435 \u0441\u043E\u043E\u0431\u0449\u0435\u043D\u0438\u044F").action(
+    (dialogId, opts) => run((ctx) => chatsMessages(ctx, dialogId, opts))
+  );
+  chats.command("search").description("\u041D\u0430\u0439\u0442\u0438 \u0441\u043E\u043E\u0431\u0449\u0435\u043D\u0438\u044F \u0432 \u043E\u0434\u043D\u043E\u043C \u0447\u0430\u0442\u0435").argument("<dialogId>", DIALOG_HELP).argument("<\u0442\u0435\u043A\u0441\u0442>", "\u0431\u043E\u043B\u044C\u0448\u0435 2 \u0441\u0438\u043C\u0432\u043E\u043B\u043E\u0432").option("--since <\u0434\u0430\u0442\u0430>", "\u0441 \u0434\u0430\u0442\u044B \u0413\u0413\u0413\u0413-\u041C\u041C-\u0414\u0414").option("--until <\u0434\u0430\u0442\u0430>", "\u043F\u043E \u0434\u0430\u0442\u0443 \u0413\u0413\u0413\u0413-\u041C\u041C-\u0414\u0414").option("--limit <n>", "\u0441\u043A\u043E\u043B\u044C\u043A\u043E (\u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E 30, \u043C\u0430\u043A\u0441\u0438\u043C\u0443\u043C 200)").option("--before <id>", "\u0437\u043D\u0430\u0447\u0435\u043D\u0438\u0435 next \u0438\u0437 \u043F\u0440\u043E\u0448\u043B\u043E\u0433\u043E \u043E\u0442\u0432\u0435\u0442\u0430").action(
+    (dialogId, text, opts) => run((ctx) => chatsSearch(ctx, dialogId, text, opts))
+  );
+  program2.command("notifications").description("\u0423\u0432\u0435\u0434\u043E\u043C\u043B\u0435\u043D\u0438\u044F: \u0443\u043F\u043E\u043C\u0438\u043D\u0430\u043D\u0438\u044F, \u043F\u043E\u0440\u0443\u0447\u0435\u043D\u0438\u044F, \u043F\u0440\u0438\u0433\u043B\u0430\u0448\u0435\u043D\u0438\u044F").option("--limit <n>", "\u0441\u043A\u043E\u043B\u044C\u043A\u043E (\u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E 20, \u043C\u0430\u043A\u0441\u0438\u043C\u0443\u043C 50)").option("--before <\u043A\u0443\u0440\u0441\u043E\u0440>", "\u0437\u043D\u0430\u0447\u0435\u043D\u0438\u0435 next \u0438\u0437 \u043F\u0440\u043E\u0448\u043B\u043E\u0433\u043E \u043E\u0442\u0432\u0435\u0442\u0430").action((opts) => run((ctx) => notifications(ctx, opts)));
+}
+
+// src/commands/update-check.ts
+var import_node_fs3 = __toESM(require("node:fs"), 1);
+var import_node_path3 = __toESM(require("node:path"), 1);
+function parseVersion(value) {
+  const normalized = value.trim().replace(/^v/i, "");
+  return /^\d+(\.\d+)*$/.test(normalized) ? normalized.split(".").map(Number) : null;
+}
+function isNewer(latest, current) {
+  const a = parseVersion(latest);
+  const b = parseVersion(current);
+  if (!a || !b) {
+    return false;
+  }
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    const x = a[i] ?? 0;
+    const y = b[i] ?? 0;
+    if (x !== y) {
+      return x > y;
+    }
+  }
+  return false;
+}
+function readCache(file) {
+  try {
+    const parsed = JSON.parse(import_node_fs3.default.readFileSync(file, "utf8"));
+    return typeof parsed.checkedAt === "string" && typeof parsed.latestVersion === "string" ? { checkedAt: parsed.checkedAt, latestVersion: parsed.latestVersion } : null;
+  } catch {
+    return null;
+  }
+}
+function writeCache(file, cache) {
+  try {
+    import_node_fs3.default.mkdirSync(import_node_path3.default.dirname(file), { recursive: true, mode: 448 });
+    import_node_fs3.default.writeFileSync(file, JSON.stringify(cache), "utf8");
+  } catch {
+  }
+}
+async function fetchLatest(fetchFn) {
+  try {
+    const response = await fetchFn(UPDATE_CHECK_URL, { signal: AbortSignal.timeout(UPDATE_CHECK_TIMEOUT_MS) });
+    if (!response.ok) {
+      return null;
+    }
+    const pkg = await response.json();
+    return typeof pkg.version === "string" ? pkg.version : null;
+  } catch {
+    return null;
+  }
+}
+async function checkForUpdate(deps = {}) {
+  const now = deps.now ?? /* @__PURE__ */ new Date();
+  const file = deps.cachePath ?? UPDATE_CHECK_CACHE_PATH;
+  const cache = readCache(file);
+  const fresh = cache !== null && now.getTime() - Date.parse(cache.checkedAt) < UPDATE_CHECK_TTL_MS;
+  let latest;
+  if (fresh && cache) {
+    latest = cache.latestVersion;
+  } else {
+    latest = await fetchLatest(deps.fetchFn ?? fetch);
+    if (latest !== null) {
+      writeCache(file, { checkedAt: now.toISOString(), latestVersion: latest });
+    } else if (cache) {
+      latest = cache.latestVersion;
+    }
+  }
+  return { currentVersion: APP_VERSION, latestVersion: latest, updateAvailable: latest !== null && isNewer(latest, APP_VERSION) };
 }
 
 // src/commands/status.ts
@@ -4785,6 +5331,7 @@ function buildProgram(run = runCommand) {
     "\u0411\u0438\u0442\u0440\u0438\u043A\u044124 \u0442\u043E\u043B\u044C\u043A\u043E \u043D\u0430 \u0447\u0442\u0435\u043D\u0438\u0435: \u0447\u0430\u0442\u044B, \u0437\u0430\u0434\u0430\u0447\u0438, \u043F\u0440\u043E\u0435\u043A\u0442\u044B, \u0434\u0438\u0441\u043A, \u043F\u043E\u0447\u0442\u0430, \u043A\u0430\u043B\u0435\u043D\u0434\u0430\u0440\u044C, \u0432\u0441\u0442\u0440\u0435\u0447\u0438, \u043B\u0435\u043D\u0442\u0430, \u0431\u0430\u0437\u0430 \u0437\u043D\u0430\u043D\u0438\u0439. \u0412\u044B\u0432\u043E\u0434 \u2014 JSON."
   ).version(APP_VERSION).helpCommand(false).exitOverride().configureOutput({ writeErr: () => void 0, outputError: () => void 0 });
   registerStatusUsers(program2, run);
+  registerChats(program2, run);
   return program2;
 }
 var HELP_CODES = /* @__PURE__ */ new Set(["commander.helpDisplayed", "commander.help", "commander.version"]);
