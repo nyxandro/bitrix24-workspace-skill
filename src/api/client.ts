@@ -190,6 +190,13 @@ export class B24Client {
 
     await this.pace();
     const tmpPath = `${destPath}.part-${process.pid}-${crypto.randomBytes(4).toString('hex')}`;
+    // Общий таймаут — только на ожидание ответа сервера. Дальше файл может идти
+    // сколь угодно долго, пока данные поступают (таймаут простоя ниже).
+    const controller = new AbortController();
+    const responseTimer = setTimeout(
+      () => controller.abort(new DOMException('response timeout', 'TimeoutError')),
+      this.timeoutMs,
+    );
     let handle: fs.promises.FileHandle | undefined;
     try {
       let response: Response;
@@ -203,10 +210,12 @@ export class B24Client {
             'Accept-Language': 'ru-RU,ru;q=0.9',
             Referer: `${this.webhook.origin}/`,
           },
-          signal: AbortSignal.timeout(this.timeoutMs),
+          signal: controller.signal,
         });
       } catch (err) {
         throw fail('transport', err);
+      } finally {
+        clearTimeout(responseTimer);
       }
       if (response.status !== 200 || !response.body) {
         throw fail(`status-${response.status}`);
@@ -221,7 +230,7 @@ export class B24Client {
       const reader = response.body.getReader();
       let bytes = 0;
       for (;;) {
-        const chunk = await this.readWithIdleTimeout(reader, fail);
+        const chunk = await this.readWithIdleTimeout(reader, controller, fail);
         if (chunk.done) {
           break;
         }
@@ -248,10 +257,12 @@ export class B24Client {
 
   private readWithIdleTimeout(
     reader: ReadableStreamDefaultReader<Uint8Array>,
+    controller: AbortController,
     fail: (reason: string) => AppError,
   ): ReturnType<ReadableStreamDefaultReader<Uint8Array>['read']> {
     return new Promise((resolve, reject) => {
       const timer = setTimeout(() => {
+        controller.abort(new DOMException('idle timeout', 'TimeoutError'));
         void reader.cancel().catch(() => undefined);
         reject(fail('idle-timeout'));
       }, this.idleTimeoutMs);

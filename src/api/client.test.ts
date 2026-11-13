@@ -215,6 +215,31 @@ describe('B24Client.download', () => {
     expect(fs.readdirSync(dir)).toEqual([]);
   });
 
+  it('медленный, но живой поток дольше таймаута ответа не обрывается', async () => {
+    const dir = tmp();
+    const fetchFn = vi.fn(async (_url: string, init: RequestInit) => {
+      let sent = 0;
+      const body = new ReadableStream<Uint8Array>({
+        async pull(controller) {
+          await new Promise((r) => setTimeout(r, 15));
+          if (init.signal?.aborted) {
+            controller.error(init.signal.reason);
+            return;
+          }
+          if (sent < 5) {
+            sent += 1;
+            controller.enqueue(new Uint8Array([sent]));
+          } else {
+            controller.close();
+          }
+        },
+      });
+      return new Response(body, { status: 200 });
+    });
+    const { client } = makeClient(fetchFn as unknown as typeof fetch, { timeoutMs: 20, idleTimeoutMs: 200 });
+    expect(await client.download(LINK, path.join(dir, 'slow-ok.bin'), 5, 100)).toEqual({ path: path.join(dir, 'slow-ok.bin'), size: 5 });
+  });
+
   it('текст ошибки не содержит ключ ссылки', async () => {
     const fetchFn = vi.fn(async () => {
       throw new TypeError(`fetch failed ${LINK}`);
