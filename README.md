@@ -158,6 +158,22 @@ CLI читает `.env` только из `~/.config/bitrix24-workspace/.env`, �
 
 </details>
 
+## С чем хорошо сочетается
+
+Рекомендуем ставить вместе с [Materials Intake](https://github.com/nyxandro/materials-intake-skill).
+Bitrix24 Workspace достаёт материалы из портала: читает переписку, письма и итоги встреч,
+скачивает файлы с диска и вложения из чатов. Materials Intake принимает всё, что пришло в проект,
+и наводит порядок в папке `inbox/`. Когда стоят оба, попросите агента забрать материалы из
+Битрикс24 и разобрать их. Скачанное не останется лежать где попало: агент разложит его по папкам
+в `inbox/`, не пустит пароли и личные данные в git и внесёт в одну опись, что это за материал,
+от кого он и что в нём решено.
+
+```bash
+npx skills add nyxandro/materials-intake-skill     # или /plugin install materials-intake --marketplace nyxandro/skills
+```
+
+Ни один из скиллов не требует другого. Bitrix24 Workspace работает так же и без Materials Intake.
+
 ## Версии
 
 Текущая версия записана в `package.json` и в шапке `skills/bitrix24-workspace/SKILL.md`. У каждой

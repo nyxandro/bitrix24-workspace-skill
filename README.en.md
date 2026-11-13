@@ -163,6 +163,23 @@ the skill.
 
 </details>
 
+## Works well with
+
+We recommend installing it together with
+[Materials Intake](https://github.com/nyxandro/materials-intake-skill). Bitrix24 Workspace gets
+the materials out of the portal: it reads chats, emails and meeting summaries, and downloads files
+from Drive and attachments from chats. Materials Intake takes in everything a project receives and
+keeps the project's `inbox/` folder in order. With both installed, ask the agent to fetch the
+materials from Bitrix24 and sort them. What was downloaded doesn't stay lying around: the agent
+files it into folders under `inbox/`, keeps passwords and personal data out of git, and records in
+one inventory what each item is, who it came from and what it decides.
+
+```bash
+npx skills add nyxandro/materials-intake-skill     # or /plugin install materials-intake --marketplace nyxandro/skills
+```
+
+Neither skill needs the other. Bitrix24 Workspace works the same without Materials Intake.
+
 ## Versions
 
 The current version is in `package.json` and in the header of
