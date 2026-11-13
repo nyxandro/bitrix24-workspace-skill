@@ -42,7 +42,7 @@
 В обычном терминале (не через чат с ИИ):
 
 ```bash
-bash -c 'mkdir -p ~/.config/bitrix24-workspace && read -rsp "Вставь адрес вебхука: " U && printf "BITRIX24_WORKSPACE_WEBHOOK_URL=%s\n" "$U" > ~/.config/bitrix24-workspace/.env && chmod 600 ~/.config/bitrix24-workspace/.env && echo " готово"'
+bash -c 'umask 077 && mkdir -p ~/.config/bitrix24-workspace && read -rsp "Вставь адрес вебхука: " U && printf "BITRIX24_WORKSPACE_WEBHOOK_URL=%s\n" "$U" > ~/.config/bitrix24-workspace/.env && chmod 600 ~/.config/bitrix24-workspace/.env && echo " готово"'
 ```
 
 Адрес не появится на экране и не попадёт в историю команд. Файл доступен только тебе.

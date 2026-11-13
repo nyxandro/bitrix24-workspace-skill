@@ -24,6 +24,7 @@ import {
 } from './common.js';
 
 const PREVIEW_CHARS = 1000;
+const MAX_COMMENTS = 50;
 // Курсорный режим ленты (LAST_ID + LIMIT): записи по номеру, без повторов и пропусков.
 // В режиме start лента сортируется по дате обновления, и новый комментарий сдвигает пост
 // между страницами (log-blogpost-get.md).
@@ -78,7 +79,7 @@ export async function feedList(ctx: CommandContext, opts: { since?: string; unti
 
 export async function feedPost(ctx: CommandContext, idRaw: string, opts: { full?: boolean; comments?: string }): Promise<Envelope> {
   const id = parseId(idRaw, 'id');
-  const limit = parseLimit(opts.comments, 20, 50, '--comments');
+  const limit = parseLimit(opts.comments, 20, MAX_COMMENTS, '--comments');
   const resp = await ctx.client.call<unknown>('log.blogpost.get', { POST_ID: id });
   const p = asArray(resp.result).filter(isObject)[0];
   if (!p) throw notFound();
@@ -90,6 +91,10 @@ export async function feedPost(ctx: CommandContext, idRaw: string, opts: { full?
   const authorId = num(p.AUTHOR_ID) ?? 0;
   const text = plain(str(p.DETAIL_TEXT), ctx.tz);
   const cut = opts.full ? { text, truncated: false } : truncate(text, MAX_TEXT_CHARS);
+  // Без курсора Битрикс отдаёт последние комментарии (log-blogcomment-get.md).
+  const commentsTotal = Math.max(num(p.NUM_COMMENTS) ?? 0, comments.length);
+  const more = limit < MAX_COMMENTS ? `больше — --comments (до ${MAX_COMMENTS})` : 'более ранние команда не показывает';
+  const notes = commentsTotal > comments.length ? [`Показаны последние ${comments.length} комментариев из ${commentsTotal}; ${more}.`] : [];
   return envelope({
     id,
     date: str(p.DATE_PUBLISH),
@@ -101,5 +106,6 @@ export async function feedPost(ctx: CommandContext, idRaw: string, opts: { full?
       const cid = num(c.author_id) ?? 0;
       return { id: num(c.id), author: { id: cid, name: nameOf(names, cid) }, date: str(c.date), text: truncate(plain(str(c.text), ctx.tz), MAX_TEXT_CHARS).text };
     }),
-  });
+    commentsTotal,
+  }, null, notes);
 }

@@ -63,6 +63,30 @@ describe('feed', () => {
   });
 });
 
+describe('feed post: комментариев больше, чем показано', () => {
+  it('commentsTotal и пометка, как дочитать', async () => {
+    const { ctx } = fakeContext({
+      'log.blogpost.get': () => ({ json: { result: [{ ...post(42), NUM_COMMENTS: '30' }] } }),
+      'log.blogcomment.get': () => ({ json: { result: { COMMENTS: [{ id: 29, author_id: 6, date: 'd', text: 'a' }, { id: 30, author_id: 6, date: 'd', text: 'b' }] } } }),
+      'user.get': users,
+    });
+    const out = await feedPost(ctx, '42', { comments: '2' });
+    expect(out.data).toMatchObject({ commentsTotal: 30 });
+    expect(out.notes.join(' ')).toContain('последние 2 комментариев из 30');
+  });
+
+  it('показаны все — пометки нет', async () => {
+    const { ctx } = fakeContext({
+      'log.blogpost.get': () => ({ json: { result: [{ ...post(42), NUM_COMMENTS: '1' }] } }),
+      'log.blogcomment.get': () => ({ json: { result: { COMMENTS: [{ id: 1, author_id: 6, date: 'd', text: 'a' }] } } }),
+      'user.get': users,
+    });
+    const out = await feedPost(ctx, '42', {});
+    expect(out.data).toMatchObject({ commentsTotal: 1 });
+    expect(out.notes).toEqual([]);
+  });
+});
+
 describe('kb', () => {
   it('list — базы и курсор nextCursor', async () => {
     const { ctx, calls } = fakeContext({ 'note.collection.list': () => ({ json: { result: { items: [{ id: 1, name: 'База', isArchived: false, updatedAt: '2026-11-01T10:00:00+03:00' }], nextCursor: { position: 1, id: 1 } } } }) });

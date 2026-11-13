@@ -112,6 +112,18 @@ describe('tasks get', () => {
     expect(JSON.stringify(data)).not.toContain('DOWNLOAD_URL');
   });
 
+  it('chatId 0 — это «чата нет», а не chat0', async () => {
+    for (const chatId of [0, '0']) {
+      const { ctx } = fakeContext({
+        'tasks.task.get': () => ({ json: { result: { task: { id: '1', title: 'Старая', description: '', status: '5', chatId } } } }),
+        'task.checklistitem.getlist': () => ({ json: { result: [] } }),
+      });
+      const out = await tasksGet(ctx, '1', {});
+      expect((out.data as M).dialogId).toBeNull();
+      expect(out.notes.join(' ')).toContain('нет чата');
+    }
+  });
+
   it('у задачи нет чата — dialogId null и пометка', async () => {
     const { ctx } = fakeContext({
       'tasks.task.get': () => ({ json: { result: { task: { id: '1', title: 'Старая', description: '', status: '5' } } } }),

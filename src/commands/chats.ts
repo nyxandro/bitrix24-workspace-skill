@@ -119,6 +119,7 @@ export async function chatsFind(ctx: CommandContext, text: string, limitRaw?: st
   const resp = await ctx.client.call<unknown>('im.search.chat.list', { FIND: text.trim(), LIMIT: limit });
   const data = asArray(resp.result)
     .filter(isObject)
+    .filter((c) => num(c.id) !== null)
     .map((c) => ({ dialogId: `chat${num(c.id)}`, title: str(c.name), type: str(c.type), entity: entityOf(c), messageCount: num(c.message_count) }));
   const notes = data.length === 0 ? ['Чаты не найдены. Чаты задач так не ищутся — для них tasks get.'] : [];
   return envelope(data, null, notes);

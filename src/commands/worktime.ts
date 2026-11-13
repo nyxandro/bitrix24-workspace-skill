@@ -4,13 +4,14 @@
 import { AppError } from '../api/errors.js';
 import { parseInputDate } from '../render/dates.js';
 import type { Envelope } from '../render/output.js';
-import { asArray, type CommandContext, envelope, isObject, type Json, num, parseLimit, str } from './common.js';
+import { asArray, type CommandContext, envelope, isObject, type Json, num, parseLimit, str, unexpected } from './common.js';
 
 const STATUS: Readonly<Record<string, string>> = { OPENED: 'идёт', CLOSED: 'закрыт', PAUSED: 'на паузе', EXPIRED: 'не закрыт вовремя' };
 
 export async function worktimeStatus(ctx: CommandContext): Promise<Envelope> {
   const resp = await ctx.client.call<Json>('timeman.status');
-  const r = isObject(resp.result) ? resp.result : {};
+  const r = resp.result;
+  if (!isObject(r)) throw unexpected('timeman.status.result');
   return envelope({
     status: STATUS[str(r.STATUS)] ?? str(r.STATUS),
     start: str(r.TIME_START) || null,

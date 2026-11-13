@@ -13,10 +13,12 @@ import {
   envelope,
   isObject,
   type Json,
+  lookupNames,
+  nameOf,
+  notFound,
   num,
   parseId,
   parseLimit,
-  personName,
   str,
 } from './common.js';
 
@@ -110,19 +112,12 @@ export async function projectsList(
 export async function projectsGet(ctx: CommandContext, idRaw: string): Promise<Envelope> {
   const id = parseId(idRaw, 'id');
   const resp = await ctx.client.call<Json>('socialnetwork.api.workgroup.get', { params: { groupId: id } });
-  const g = isObject(resp.result) ? resp.result : {};
+  const g = isObject(resp.result) ? resp.result : null;
+  if (!g || num(pick(g, 'id', 'ID')) === null) throw notFound();
   const memberRows = await ctx.client.call<unknown>('sonet_group.user.get', { ID: id });
   const rows = asArray(memberRows.result).filter(isObject);
   const shown = rows.slice(0, MAX_MEMBERS);
-  const ids = shown.map((r) => num(r.USER_ID)).filter((u): u is number => u !== null);
-  const names = new Map<number, string>();
-  if (ids.length > 0) {
-    const users = await ctx.client.call<unknown>('user.get', { filter: { ID: ids } });
-    for (const u of asArray(users.result).filter(isObject)) {
-      const uid = num(u.ID);
-      if (uid !== null) names.set(uid, personName(u));
-    }
-  }
+  const names = await lookupNames(ctx, shown.map((r) => num(r.USER_ID)).filter((u): u is number => u !== null));
   const description = truncate(bbToText(str(pick(g, 'description', 'DESCRIPTION')), new Map(), ctx.tz), MAX_TEXT_CHARS);
   const total = Math.max(num(pick(g, 'numberOfMembers', 'NUMBER_OF_MEMBERS')) ?? 0, rows.length);
   return envelope(
@@ -136,7 +131,7 @@ export async function projectsGet(ctx: CommandContext, idRaw: string): Promise<E
       dialogId: `sg${id}`,
       members: shown.map((r) => {
         const uid = num(r.USER_ID) ?? 0;
-        return { id: uid, name: names.get(uid) ?? `сотрудник ${uid}`, role: ROLE_NAMES[str(r.ROLE)] ?? str(r.ROLE) };
+        return { id: uid, name: nameOf(names, uid), role: ROLE_NAMES[str(r.ROLE)] ?? str(r.ROLE) };
       }),
       membersTotal: total,
     },

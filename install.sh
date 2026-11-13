@@ -23,6 +23,24 @@ CLAUDE_DIR="$HOME/.claude/skills"
 CONFIG_DIR="$HOME/.config/bitrix24-workspace"
 ENV_FILE="$CONFIG_DIR/.env"
 
+# Справка печатается из самого скрипта, а не из файла "$0": при запуске через
+# «curl … | bash» такого файла нет.
+usage() {
+  cat <<'USAGE'
+Установщик скилла bitrix24-workspace (Linux, macOS, WSL).
+
+  curl -fsSL https://raw.githubusercontent.com/nyxandro/bitrix24-workspace-skill/main/install.sh | bash
+  bash install.sh --file bitrix24-workspace.skill [--dir <папка скиллов агента>]
+
+  --file <архив>   поставить из локального архива (для машин без доступа в интернет)
+  --dir <папка>    ещё одна папка скиллов (Hermes и др.), можно повторять
+
+Кладёт скилл в ~/.agents/skills/bitrix24-workspace, ссылку на него — в ~/.claude/skills,
+создаёт пустой ~/.config/bitrix24-workspace/.env с правами 600 (существующий не трогает).
+Адрес вебхука вписываешь сам — это секрет, в чат с ИИ его не присылают.
+USAGE
+}
+
 info() { printf '%s\n' "$*"; }
 die() { printf 'Ошибка: %s\n' "$*" >&2; exit 1; }
 
@@ -32,7 +50,7 @@ while [ $# -gt 0 ]; do
   case "$1" in
     --file) [ $# -ge 2 ] || die "у --file не указан путь к архиву"; FILE="$2"; shift 2 ;;
     --dir) [ $# -ge 2 ] || die "у --dir не указана папка"; EXTRA_DIRS+=("$2"); shift 2 ;;
-    -h|--help) sed -n '2,15p' "$0"; exit 0 ;;
+    -h|--help) usage; exit 0 ;;
     *) die "неизвестный параметр «$1». Справка: bash install.sh --help" ;;
   esac
 done
@@ -91,7 +109,8 @@ chmod 700 "$CONFIG_DIR"
 if [ -f "$ENV_FILE" ]; then
   info "• $ENV_FILE уже есть — не трогаю."
 else
-  cat > "$ENV_FILE" <<'TEMPLATE'
+  # Файл с самого начала создаётся закрытым от других пользователей машины.
+  (umask 077; cat > "$ENV_FILE") <<'TEMPLATE'
 # Адрес входящего вебхука Битрикс24 — секрет, в чат с ИИ не присылать.
 # Как создать вебхук и какие права дать: references/setup.md в папке скилла.
 BITRIX24_WORKSPACE_WEBHOOK_URL=

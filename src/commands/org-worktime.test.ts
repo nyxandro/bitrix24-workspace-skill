@@ -43,6 +43,11 @@ describe('org', () => {
 });
 
 describe('worktime', () => {
+  it('status — Битрикс вернул не объект: APP_B24_UNEXPECTED_RESPONSE, а не пустой статус', async () => {
+    const { ctx } = fakeContext({ 'timeman.status': () => ({ json: { result: null } }) });
+    await expect(worktimeStatus(ctx)).rejects.toMatchObject({ code: 'APP_B24_UNEXPECTED_RESPONSE' });
+  });
+
   it('status — по-русски', async () => {
     const { ctx } = fakeContext({ 'timeman.status': () => ({ json: { result: { STATUS: 'CLOSED', TIME_START: '2026-11-13T09:00:00+03:00', TIME_FINISH: '2026-11-13T18:00:00+03:00', DURATION: '08:00:00', TIME_LEAKS: '01:00:00' } } }) });
     expect((await worktimeStatus(ctx)).data).toEqual({ status: 'закрыт', start: '2026-11-13T09:00:00+03:00', finish: '2026-11-13T18:00:00+03:00', duration: '08:00:00', breaks: '01:00:00' });

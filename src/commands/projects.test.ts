@@ -59,6 +59,13 @@ describe('projects list', () => {
 });
 
 describe('projects get', () => {
+  it('Битрикс вернул пустоту вместо группы — APP_B24_NOT_FOUND, а не пустая карточка', async () => {
+    for (const result of [null, [], {}]) {
+      const { ctx } = fakeContext({ 'socialnetwork.api.workgroup.get': () => ({ json: { result } }) });
+      await expect(projectsGet(ctx, '15')).rejects.toMatchObject({ code: 'APP_B24_NOT_FOUND' });
+    }
+  });
+
   it('карточка и участники с именами, до 50', async () => {
     const members = Array.from({ length: 60 }, (_, i) => ({ USER_ID: String(i + 1), ROLE: i === 0 ? 'A' : 'K' }));
     const { ctx, calls } = fakeContext({

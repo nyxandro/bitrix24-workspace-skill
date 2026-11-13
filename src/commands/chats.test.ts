@@ -183,6 +183,11 @@ describe('chats find, info, counters, search', () => {
     expect((await chatsFind(ctx, 'Проект')).data).toEqual([{ dialogId: 'chat42', title: 'Проект', type: 'open', entity: null, messageCount: 3 }]);
   });
 
+  it('find — запись без номера чата пропускается, а не превращается в chatnull', async () => {
+    const { ctx } = fakeContext({ 'im.search.chat.list': () => ({ json: { result: [{ name: 'Без номера' }, { id: 7, name: 'С номером', type: 'chat' }] } }) });
+    expect(((await chatsFind(ctx, 'номер')).data as { dialogId: string }[]).map((c) => c.dialogId)).toEqual(['chat7']);
+  });
+
   it('info — участники до 50 и общее число', async () => {
     const members = Array.from({ length: 300 }, (_, i) => ({ id: i + 1, name: `Сотрудник ${i + 1}`, work_position: 'Инженер' }));
     const { ctx, calls } = fakeContext({

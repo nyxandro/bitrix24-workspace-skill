@@ -1,10 +1,12 @@
 /**
  * status — первое, что вызывает агент: портал, от чьего имени работает вебхук,
- * какие разделы доступны, лишние права, новая версия скилла.
+ * какие разделы доступны, лишние права, новая версия скилла, закрыт ли файл с вебхуком.
  */
-import { checkForUpdate, type UpdateInfo } from './update-check.js';
-import { type CommandContext, envelope, type Json, num, personName } from './common.js';
+import fs from 'node:fs';
+import { ENV_PATH, ENV_PATH_DISPLAY } from '../config/config.js';
 import type { Envelope } from '../render/output.js';
+import { type CommandContext, envelope, isObject, type Json, num, personName, unexpected } from './common.js';
+import { checkForUpdate, type UpdateInfo } from './update-check.js';
 
 // Раздел скилла → права вебхука. Для «сотрудников» годится любое из прав user*.
 export const SECTION_SCOPES: Readonly<Record<string, readonly string[]>> = {
@@ -25,11 +27,33 @@ export const SECTION_SCOPES: Readonly<Record<string, readonly string[]>> = {
 // Для раздела «сотрудники» годится любое из прав user*, но user (с приглашением и правкой
 // профилей) шире нужного — его помечаем лишним.
 const USER_SCOPES = ['user', 'user_basic', 'user_brief'];
+const OTHERS_ACCESS_BITS = 0o077;
 
-export async function status(ctx: CommandContext, check: () => Promise<UpdateInfo> = () => checkForUpdate()): Promise<Envelope> {
+// Права доступа к файлу с вебхуком; null — файла нет (адрес задан переменной
+// окружения) или система без прав в стиле Unix.
+export function envFileMode(envPath: string = ENV_PATH): number | null {
+  if (process.platform === 'win32') return null;
+  try {
+    return fs.statSync(envPath).mode;
+  } catch {
+    return null;
+  }
+}
+
+export interface StatusDeps {
+  check?: () => Promise<UpdateInfo>;
+  envFileMode?: () => number | null;
+}
+
+export async function status(ctx: CommandContext, deps: StatusDeps = {}): Promise<Envelope> {
+  const check = deps.check ?? (() => checkForUpdate());
+  const readMode = deps.envFileMode ?? (() => envFileMode());
   const scopeResp = await ctx.client.call<unknown>('scope');
-  const granted = (Array.isArray(scopeResp.result) ? scopeResp.result : []).map(String).sort();
+  // Без списка прав нельзя честно сказать, что доступно: пустой список выглядел бы как «нет ни одного права».
+  if (!Array.isArray(scopeResp.result)) throw unexpected('scope.result');
+  const granted = scopeResp.result.map(String).sort();
   const me = await ctx.client.call<Json>('user.current');
+  if (!isObject(me.result)) throw unexpected('user.current.result');
   const version = await check();
 
   const sections: Record<string, string> = {};
@@ -49,6 +73,10 @@ export async function status(ctx: CommandContext, check: () => Promise<UpdateInf
   }
   if (extra.length > 0) {
     notes.push(`Лишние права у вебхука: ${extra.join(', ')} — скиллу они не нужны, их можно снять в настройках вебхука.`);
+  }
+  const mode = readMode();
+  if (mode !== null && (mode & OTHERS_ACCESS_BITS) !== 0) {
+    notes.push(`Файл с адресом вебхука ${ENV_PATH_DISPLAY} доступен другим пользователям этой машины. Закройте его: chmod 600 ${ENV_PATH_DISPLAY}.`);
   }
   if (version.updateAvailable) {
     notes.push(`Вышла новая версия скилла ${version.latestVersion} (сейчас ${version.currentVersion}). Обновить: повторить установку.`);

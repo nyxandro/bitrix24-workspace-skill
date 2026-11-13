@@ -1194,7 +1194,7 @@ var require_command = __commonJS({
     var EventEmitter = require("node:events").EventEmitter;
     var childProcess = require("node:child_process");
     var path5 = require("node:path");
-    var fs5 = require("node:fs");
+    var fs6 = require("node:fs");
     var process3 = require("node:process");
     var { Argument: Argument2, humanReadableArgName } = require_argument();
     var { CommanderError: CommanderError2 } = require_error();
@@ -2188,7 +2188,7 @@ Expecting one of '${allowedValues.join("', '")}'`);
        * @param {string} subcommandName
        */
       _checkForMissingExecutable(executableFile, executableDir, subcommandName) {
-        if (fs5.existsSync(executableFile)) return;
+        if (fs6.existsSync(executableFile)) return;
         const executableDirMessage = executableDir ? `searched for local subcommand relative to directory '${executableDir}'` : "no directory for search for local subcommand, use .executableDir() to supply a custom directory";
         const executableMissing = `'${executableFile}' does not exist
  - if '${subcommandName}' is not meant to be an executable command, remove description parameter from '.command()' and use '.description()' instead
@@ -2207,10 +2207,10 @@ Expecting one of '${allowedValues.join("', '")}'`);
         const sourceExt = [".js", ".ts", ".tsx", ".mjs", ".cjs"];
         function findFile(baseDir, baseName) {
           const localBin = path5.resolve(baseDir, baseName);
-          if (fs5.existsSync(localBin)) return localBin;
+          if (fs6.existsSync(localBin)) return localBin;
           if (sourceExt.includes(path5.extname(baseName))) return void 0;
           const foundExt = sourceExt.find(
-            (ext) => fs5.existsSync(`${localBin}${ext}`)
+            (ext) => fs6.existsSync(`${localBin}${ext}`)
           );
           if (foundExt) return `${localBin}${foundExt}`;
           return void 0;
@@ -2222,7 +2222,7 @@ Expecting one of '${allowedValues.join("', '")}'`);
         if (this._scriptPath) {
           let resolvedScriptPath;
           try {
-            resolvedScriptPath = fs5.realpathSync(this._scriptPath);
+            resolvedScriptPath = fs6.realpathSync(this._scriptPath);
           } catch {
             resolvedScriptPath = this._scriptPath;
           }
@@ -3459,7 +3459,7 @@ var require_commander = __commonJS({
 // node_modules/dotenv/lib/main.js
 var require_main = __commonJS({
   "node_modules/dotenv/lib/main.js"(exports2, module2) {
-    var fs5 = require("fs");
+    var fs6 = require("fs");
     var path5 = require("path");
     var os2 = require("os");
     var crypto2 = require("crypto");
@@ -3591,7 +3591,7 @@ var require_main = __commonJS({
       if (options && options.path && options.path.length > 0) {
         if (Array.isArray(options.path)) {
           for (const filepath of options.path) {
-            if (fs5.existsSync(filepath)) {
+            if (fs6.existsSync(filepath)) {
               possibleVaultPath = filepath.endsWith(".vault") ? filepath : `${filepath}.vault`;
             }
           }
@@ -3601,7 +3601,7 @@ var require_main = __commonJS({
       } else {
         possibleVaultPath = path5.resolve(process.cwd(), ".env.vault");
       }
-      if (fs5.existsSync(possibleVaultPath)) {
+      if (fs6.existsSync(possibleVaultPath)) {
         return possibleVaultPath;
       }
       return null;
@@ -3654,7 +3654,7 @@ var require_main = __commonJS({
       const parsedAll = {};
       for (const path6 of optionPaths) {
         try {
-          const parsed = DotenvModule.parse(fs5.readFileSync(path6, { encoding }));
+          const parsed = DotenvModule.parse(fs6.readFileSync(path6, { encoding }));
           DotenvModule.populate(parsedAll, parsed, options);
         } catch (e) {
           if (debug) {
@@ -10070,10 +10070,6 @@ function mailBodyToText(body) {
 
 // src/render/text.ts
 var KNOWN_TAGS = [
-  "B",
-  "I",
-  "U",
-  "S",
   "COLOR",
   "SIZE",
   "FONT",
@@ -10085,7 +10081,6 @@ var KNOWN_TAGS = [
   "IMG",
   "VIDEO",
   "SPOILER",
-  "P",
   "HR",
   "PCH",
   "ATTACH",
@@ -10099,6 +10094,34 @@ var KNOWN_TAGS = [
   "DATE",
   "BOT"
 ];
+var PAIRED_TAG_RE = /\[(\/?)([BIUSP])\]/gi;
+function stripPairedTags(text) {
+  const tags = [...text.matchAll(PAIRED_TAG_RE)];
+  const open = /* @__PURE__ */ new Map();
+  const paired = /* @__PURE__ */ new Set();
+  tags.forEach((tag, i) => {
+    const letter = tag[2].toUpperCase();
+    const stack = open.get(letter) ?? [];
+    open.set(letter, stack);
+    if (tag[1] === "") {
+      stack.push(i);
+      return;
+    }
+    const opener = stack.pop();
+    if (opener !== void 0) {
+      paired.add(opener).add(i);
+    }
+  });
+  if (paired.size === 0) return text;
+  let out = "";
+  let pos = 0;
+  tags.forEach((tag, i) => {
+    if (!paired.has(i)) return;
+    out += text.slice(pos, tag.index);
+    pos = tag.index + tag[0].length;
+  });
+  return out + text.slice(pos);
+}
 var KNOWN_TAG_RE = new RegExp(`\\[\\/?(?:${KNOWN_TAGS.join("|")})(?:=[^\\]]*)?(?:\\s[^\\]]*)?\\]`, "gi");
 var ENTITIES = {
   "&amp;": "&",
@@ -10136,7 +10159,7 @@ function bbToText(raw, users = /* @__PURE__ */ new Map(), tz = machineTimeZone()
     /\[QUOTE\]([\s\S]*?)\[\/QUOTE\]\n?/gi,
     (_m, body) => body.trim().split("\n").map((line) => `> ${line}`).join("\n").concat("\n")
   );
-  text = text.replace(KNOWN_TAG_RE, "");
+  text = stripPairedTags(text.replace(KNOWN_TAG_RE, ""));
   text = text.replace(/\[\/?(?:USER|URL|QUOTE)(?:=[^\]]*)?(?:\s[^\]]*)?\]/gi, "");
   text = text.replace(/&(?:amp|lt|gt|quot|nbsp|#0?39);/g, (entity) => ENTITIES[entity] ?? entity);
   text = text.replace(/\uE000(\d+)\uE000/g, (match, i) => codeBlocks[Number(i)] ?? match);
@@ -10425,6 +10448,7 @@ function mapBitrixError(input) {
 function isDownloadPath(pathname, webhook) {
   return pathname === "/rest/download.json" || pathname === `/rest/${webhook.userId}/${webhook.code}/download/`;
 }
+var MAX_DOWNLOAD_REDIRECTS = 3;
 function isObject(value) {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
@@ -10569,18 +10593,22 @@ var B24Client = class {
       details: { reason },
       cause
     });
-    let parsed;
-    try {
-      parsed = new URL(url);
-    } catch {
-      throw fail("bad-url");
-    }
-    if (parsed.origin !== this.webhook.origin) {
-      throw fail("foreign-host");
-    }
-    if (!isDownloadPath(parsed.pathname, this.webhook)) {
-      throw fail("not-a-download-link");
-    }
+    const checkLink = (raw, base) => {
+      let parsed;
+      try {
+        parsed = new URL(raw, base);
+      } catch {
+        throw fail("bad-url");
+      }
+      if (parsed.origin !== this.webhook.origin) {
+        throw fail("foreign-host");
+      }
+      if (!isDownloadPath(parsed.pathname, this.webhook)) {
+        throw fail("not-a-download-link");
+      }
+      return parsed;
+    };
+    let target = checkLink(url);
     await this.pace();
     const tmpPath = `${destPath}.part-${process.pid}-${import_node_crypto.default.randomBytes(4).toString("hex")}`;
     const controller = new AbortController();
@@ -10592,26 +10620,35 @@ var B24Client = class {
     try {
       let response;
       try {
-        response = await this.fetchFn(url, {
-          method: "GET",
-          redirect: "follow",
-          headers: {
-            "User-Agent": USER_AGENT,
-            Accept: "*/*",
-            "Accept-Language": "ru-RU,ru;q=0.9",
-            Referer: `${this.webhook.origin}/`
-          },
-          signal: controller.signal
-        });
+        for (let hop = 0; ; hop += 1) {
+          response = await this.fetchFn(target.href, {
+            method: "GET",
+            redirect: "manual",
+            headers: {
+              "User-Agent": USER_AGENT,
+              Accept: "*/*",
+              "Accept-Language": "ru-RU,ru;q=0.9",
+              Referer: `${this.webhook.origin}/`
+            },
+            signal: controller.signal
+          });
+          if (response.status < 300 || response.status >= 400) {
+            break;
+          }
+          void response.body?.cancel().catch(() => void 0);
+          const location = response.headers.get("location");
+          if (location === null) {
+            throw fail(`status-${response.status}`);
+          }
+          if (hop >= MAX_DOWNLOAD_REDIRECTS) {
+            throw fail("redirect-limit");
+          }
+          target = checkLink(location, target.href);
+        }
       } catch (err) {
-        throw fail("transport", err);
+        throw err instanceof AppError ? err : fail("transport", err);
       } finally {
         clearTimeout(responseTimer);
-      }
-      const finalUrl = response.url === "" ? url : response.url;
-      if (new URL(finalUrl).origin !== this.webhook.origin) {
-        void response.body?.cancel().catch(() => void 0);
-        throw fail("redirect-foreign-host");
       }
       if (response.status !== 200 || !response.body) {
         void response.body?.cancel().catch(() => void 0);
@@ -11321,7 +11358,7 @@ async function chatsFind(ctx, text, limitRaw) {
     throw invalid3("\u041F\u0430\u0440\u0430\u043C\u0435\u0442\u0440 \u0442\u0435\u043A\u0441\u0442: \u043D\u0443\u0436\u043D\u043E \u043D\u0435 \u043C\u0435\u043D\u044C\u0448\u0435 2 \u0441\u0438\u043C\u0432\u043E\u043B\u043E\u0432.");
   }
   const resp = await ctx.client.call("im.search.chat.list", { FIND: text.trim(), LIMIT: limit });
-  const data = asArray(resp.result).filter(isObject2).map((c) => ({ dialogId: `chat${num(c.id)}`, title: str(c.name), type: str(c.type), entity: entityOf(c), messageCount: num(c.message_count) }));
+  const data = asArray(resp.result).filter(isObject2).filter((c) => num(c.id) !== null).map((c) => ({ dialogId: `chat${num(c.id)}`, title: str(c.name), type: str(c.type), entity: entityOf(c), messageCount: num(c.message_count) }));
   const notes = data.length === 0 ? ["\u0427\u0430\u0442\u044B \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u044B. \u0427\u0430\u0442\u044B \u0437\u0430\u0434\u0430\u0447 \u0442\u0430\u043A \u043D\u0435 \u0438\u0449\u0443\u0442\u0441\u044F \u2014 \u0434\u043B\u044F \u043D\u0438\u0445 tasks get."] : [];
   return envelope(data, null, notes);
 }
@@ -11526,7 +11563,8 @@ async function diskStorages(ctx, opts) {
     return envelope(asArray(resp.result).filter(isObject2).map(storageOf), next, next ? ["\u0415\u0441\u0442\u044C \u0435\u0449\u0451 \u0445\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0430: --page <next>."] : []);
   }
   const groups = await ctx.client.call("sonet_group.user.groups");
-  const groupIds = asArray(groups.result).filter(isObject2).map((g) => num(g.GROUP_ID)).filter((id) => id !== null).slice(0, MAX_GROUP_STORAGE_IDS);
+  const allGroupIds = asArray(groups.result).filter(isObject2).map((g) => num(g.GROUP_ID)).filter((id) => id !== null);
+  const groupIds = allGroupIds.slice(0, MAX_GROUP_STORAGE_IDS);
   const own = await ctx.client.call("disk.storage.getlist", { filter: { ENTITY_TYPE: "user", ENTITY_ID: ctx.webhook.userId } });
   const common = await ctx.client.call("disk.storage.getlist", { filter: { ENTITY_TYPE: "common" } });
   const result = [...asArray(own.result), ...asArray(common.result)];
@@ -11534,7 +11572,11 @@ async function diskStorages(ctx, opts) {
     const group = await ctx.client.call("disk.storage.getlist", { filter: { ENTITY_TYPE: "group", "@ENTITY_ID": groupIds } });
     result.push(...asArray(group.result));
   }
-  return envelope(result.filter(isObject2).map(storageOf), null, ["\u0412\u0441\u0435 \u0445\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0430, \u043A\u043E\u0442\u043E\u0440\u044B\u0435 \u0432\u0430\u043C \u0432\u0438\u0434\u043D\u044B, \u2014 disk storages --all."]);
+  const notes = ["\u0412\u0441\u0435 \u0445\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0430, \u043A\u043E\u0442\u043E\u0440\u044B\u0435 \u0432\u0430\u043C \u0432\u0438\u0434\u043D\u044B, \u2014 disk storages --all."];
+  if (allGroupIds.length > groupIds.length) {
+    notes.unshift(`\u0414\u0438\u0441\u043A\u0438 \u0433\u0440\u0443\u043F\u043F \u043F\u043E\u043A\u0430\u0437\u0430\u043D\u044B \u0442\u043E\u043B\u044C\u043A\u043E \u0434\u043B\u044F \u043F\u0435\u0440\u0432\u044B\u0445 ${groupIds.length} \u0438\u0437 ${allGroupIds.length} \u0432\u0430\u0448\u0438\u0445 \u0433\u0440\u0443\u043F\u043F; \u043E\u0441\u0442\u0430\u043B\u044C\u043D\u044B\u0435 \u2014 disk storages --all.`);
+  }
+  return envelope(result.filter(isObject2).map(storageOf), null, notes);
 }
 async function diskLs(ctx, target, opts) {
   const match = /^(storage|folder):(\d+)$/.exec(target.trim());
@@ -11584,7 +11626,9 @@ function fileInfo(f) {
 }
 async function diskFile(ctx, idRaw) {
   const resp = await ctx.client.call("disk.file.get", { id: parseId(idRaw, "id") });
-  return envelope(fileInfo(isObject2(resp.result) ? resp.result : {}));
+  const f = isObject2(resp.result) ? resp.result : null;
+  if (!f || num(f.ID) === null) throw notFound();
+  return envelope(fileInfo(f));
 }
 var MAX_NAME_BYTES = 180;
 var MAX_EXT_BYTES = 20;
@@ -11632,7 +11676,8 @@ async function diskDownload(ctx, idRaw, opts) {
   }
   const maxMb = opts.maxMb ? parsePositiveInt(opts.maxMb, "--max-mb", MAX_MB) : DEFAULT_MAX_MB;
   const resp = await ctx.client.call("disk.file.get", { id: parseId(idRaw, "id") });
-  const f = isObject2(resp.result) ? resp.result : {};
+  const f = isObject2(resp.result) ? resp.result : null;
+  if (!f || num(f.ID) === null) throw notFound();
   const size = num(f.SIZE);
   const url = str(f.DOWNLOAD_URL);
   if (size === null || url === "") {
@@ -11667,6 +11712,7 @@ function registerDisk(program2, run) {
 
 // src/commands/feed.ts
 var PREVIEW_CHARS = 1e3;
+var MAX_COMMENTS = 50;
 var isFeedCursor = (v) => isObject2(v) && Number.isSafeInteger(v.l) && v.l > 0;
 function plain(raw, tz) {
   const text = bbToText(raw, /* @__PURE__ */ new Map(), tz);
@@ -11704,7 +11750,7 @@ async function feedList(ctx, opts) {
 }
 async function feedPost(ctx, idRaw, opts) {
   const id = parseId(idRaw, "id");
-  const limit = parseLimit(opts.comments, 20, 50, "--comments");
+  const limit = parseLimit(opts.comments, 20, MAX_COMMENTS, "--comments");
   const resp = await ctx.client.call("log.blogpost.get", { POST_ID: id });
   const p = asArray(resp.result).filter(isObject2)[0];
   if (!p) throw notFound();
@@ -11716,6 +11762,9 @@ async function feedPost(ctx, idRaw, opts) {
   const authorId = num(p.AUTHOR_ID) ?? 0;
   const text = plain(str(p.DETAIL_TEXT), ctx.tz);
   const cut = opts.full ? { text, truncated: false } : truncate(text, MAX_TEXT_CHARS);
+  const commentsTotal = Math.max(num(p.NUM_COMMENTS) ?? 0, comments.length);
+  const more = limit < MAX_COMMENTS ? `\u0431\u043E\u043B\u044C\u0448\u0435 \u2014 --comments (\u0434\u043E ${MAX_COMMENTS})` : "\u0431\u043E\u043B\u0435\u0435 \u0440\u0430\u043D\u043D\u0438\u0435 \u043A\u043E\u043C\u0430\u043D\u0434\u0430 \u043D\u0435 \u043F\u043E\u043A\u0430\u0437\u044B\u0432\u0430\u0435\u0442";
+  const notes = commentsTotal > comments.length ? [`\u041F\u043E\u043A\u0430\u0437\u0430\u043D\u044B \u043F\u043E\u0441\u043B\u0435\u0434\u043D\u0438\u0435 ${comments.length} \u043A\u043E\u043C\u043C\u0435\u043D\u0442\u0430\u0440\u0438\u0435\u0432 \u0438\u0437 ${commentsTotal}; ${more}.`] : [];
   return envelope({
     id,
     date: str(p.DATE_PUBLISH),
@@ -11726,8 +11775,9 @@ async function feedPost(ctx, idRaw, opts) {
     comments: comments.map((c) => {
       const cid = num(c.author_id) ?? 0;
       return { id: num(c.id), author: { id: cid, name: nameOf(names, cid) }, date: str(c.date), text: truncate(plain(str(c.text), ctx.tz), MAX_TEXT_CHARS).text };
-    })
-  });
+    }),
+    commentsTotal
+  }, null, notes);
 }
 
 // src/commands/kb.ts
@@ -11801,6 +11851,7 @@ function registerFeedKb(program2, run) {
 
 // src/commands/mail.ts
 var PREVIEW_CHARS2 = 300;
+var MAX_THREAD = 50;
 var isPageCursor = (v) => isObject2(v) && Number.isSafeInteger(v.p) && v.p >= 1 && Number.isSafeInteger(v.l) && v.l >= 1;
 function mailDate(raw) {
   const value = str(raw);
@@ -11859,10 +11910,10 @@ async function mailGet(ctx, idRaw, opts) {
   );
 }
 async function mailThread(ctx, idRaw, opts) {
-  const limit = parseLimit(opts.limit, 20, 50);
+  const limit = parseLimit(opts.limit, 20, MAX_THREAD);
   const resp = await ctx.client.callV3("mail.message.thread", { id: parseId(idRaw, "id"), limit });
   const data = (Array.isArray(resp) ? resp : asArray(isObject2(resp) ? resp.items : [])).filter(isObject2).map((m) => ({ id: num(m.id), subject: str(m.subject), from: address(m.from), date: mailDate(m.date), preview: truncate(mailBodyToText(str(m.body)), PREVIEW_CHARS2).text }));
-  return envelope(data);
+  return envelope(data, null, data.length >= limit ? [`\u041F\u043E\u043A\u0430\u0437\u0430\u043D\u044B ${data.length} \u043F\u0438\u0441\u0435\u043C \u2014 \u0446\u0435\u043F\u043E\u0447\u043A\u0430 \u043C\u043E\u0436\u0435\u0442 \u0431\u044B\u0442\u044C \u0434\u043B\u0438\u043D\u043D\u0435\u0435${limit < MAX_THREAD ? `; \u0443\u0432\u0435\u043B\u0438\u0447\u044C\u0442\u0435 --limit (\u0434\u043E ${MAX_THREAD})` : ", \u043D\u043E \u0431\u043E\u043B\u044C\u0448\u0435 \u043A\u043E\u043C\u0430\u043D\u0434\u0430 \u043D\u0435 \u043F\u043E\u043A\u0430\u0437\u044B\u0432\u0430\u0435\u0442"}.`] : []);
 }
 
 // src/cli/register-mail.ts
@@ -11929,7 +11980,8 @@ async function orgDepartment(ctx, idRaw, opts) {
 var STATUS = { OPENED: "\u0438\u0434\u0451\u0442", CLOSED: "\u0437\u0430\u043A\u0440\u044B\u0442", PAUSED: "\u043D\u0430 \u043F\u0430\u0443\u0437\u0435", EXPIRED: "\u043D\u0435 \u0437\u0430\u043A\u0440\u044B\u0442 \u0432\u043E\u0432\u0440\u0435\u043C\u044F" };
 async function worktimeStatus(ctx) {
   const resp = await ctx.client.call("timeman.status");
-  const r = isObject2(resp.result) ? resp.result : {};
+  const r = resp.result;
+  if (!isObject2(r)) throw unexpected2("timeman.status.result");
   return envelope({
     status: STATUS[str(r.STATUS)] ?? str(r.STATUS),
     start: str(r.TIME_START) || null,
@@ -12049,19 +12101,12 @@ async function projectsList(ctx, opts) {
 async function projectsGet(ctx, idRaw) {
   const id = parseId(idRaw, "id");
   const resp = await ctx.client.call("socialnetwork.api.workgroup.get", { params: { groupId: id } });
-  const g = isObject2(resp.result) ? resp.result : {};
+  const g = isObject2(resp.result) ? resp.result : null;
+  if (!g || num(pick(g, "id", "ID")) === null) throw notFound();
   const memberRows = await ctx.client.call("sonet_group.user.get", { ID: id });
   const rows = asArray(memberRows.result).filter(isObject2);
   const shown = rows.slice(0, MAX_MEMBERS);
-  const ids = shown.map((r) => num(r.USER_ID)).filter((u) => u !== null);
-  const names = /* @__PURE__ */ new Map();
-  if (ids.length > 0) {
-    const users = await ctx.client.call("user.get", { filter: { ID: ids } });
-    for (const u of asArray(users.result).filter(isObject2)) {
-      const uid = num(u.ID);
-      if (uid !== null) names.set(uid, personName(u));
-    }
-  }
+  const names = await lookupNames(ctx, shown.map((r) => num(r.USER_ID)).filter((u) => u !== null));
   const description = truncate(bbToText(str(pick(g, "description", "DESCRIPTION")), /* @__PURE__ */ new Map(), ctx.tz), MAX_TEXT_CHARS);
   const total = Math.max(num(pick(g, "numberOfMembers", "NUMBER_OF_MEMBERS")) ?? 0, rows.length);
   return envelope(
@@ -12075,7 +12120,7 @@ async function projectsGet(ctx, idRaw) {
       dialogId: `sg${id}`,
       members: shown.map((r) => {
         const uid = num(r.USER_ID) ?? 0;
-        return { id: uid, name: names.get(uid) ?? `\u0441\u043E\u0442\u0440\u0443\u0434\u043D\u0438\u043A ${uid}`, role: ROLE_NAMES[str(r.ROLE)] ?? str(r.ROLE) };
+        return { id: uid, name: nameOf(names, uid), role: ROLE_NAMES[str(r.ROLE)] ?? str(r.ROLE) };
       }),
       membersTotal: total
     },
@@ -12215,7 +12260,8 @@ async function tasksGet(ctx, idRaw, opts) {
   const text = bbToText(rawDescription, /* @__PURE__ */ new Map(), ctx.tz);
   const description = opts.full ? { text, truncated: false } : truncate(text, MAX_TEXT_CHARS);
   const linkedDialogs = [...new Set([...rawDescription.matchAll(IM_DIALOG_RE)].map((m) => m[1]))];
-  const chatId = num(t.chatId);
+  const rawChatId = num(t.chatId);
+  const chatId = rawChatId !== null && rawChatId > 0 ? rawChatId : null;
   const checklistResp = await ctx.client.call("task.checklistitem.getlist", { TASKID: id });
   const checklist = asArray(checklistResp.result).filter(isObject2).map((c) => ({ id: num(c.ID), parentId: num(c.PARENT_ID), title: str(c.TITLE), done: c.IS_COMPLETE === "Y" }));
   const notes = chatId === null ? ["\u0423 \u0437\u0430\u0434\u0430\u0447\u0438 \u043D\u0435\u0442 \u0447\u0430\u0442\u0430 \u2014 \u043E\u0431\u0441\u0443\u0436\u0434\u0435\u043D\u0438\u044F \u043D\u0435\u0442 \u0438\u043B\u0438 \u0437\u0430\u0434\u0430\u0447\u0430 \u0432 \u0441\u0442\u0430\u0440\u043E\u043C \u0444\u043E\u0440\u043C\u0430\u0442\u0435."] : [];
@@ -12256,6 +12302,9 @@ function registerProjectsTasks(program2, run) {
   );
   tasks.command("get").description("\u041A\u0430\u0440\u0442\u043E\u0447\u043A\u0430 \u0437\u0430\u0434\u0430\u0447\u0438: dialogId \u0435\u0451 \u0447\u0430\u0442\u0430, \u0447\u0430\u0442\u044B \u0438\u0437 \u043E\u043F\u0438\u0441\u0430\u043D\u0438\u044F, \u0447\u0435\u043A-\u043B\u0438\u0441\u0442").argument("<id>", "\u043D\u043E\u043C\u0435\u0440 \u0437\u0430\u0434\u0430\u0447\u0438").option("--full", "\u043D\u0435 \u043E\u0431\u0440\u0435\u0437\u0430\u0442\u044C \u043E\u043F\u0438\u0441\u0430\u043D\u0438\u0435").action((id, opts) => run((ctx) => tasksGet(ctx, id, opts)));
 }
+
+// src/commands/status.ts
+var import_node_fs5 = __toESM(require("node:fs"), 1);
 
 // src/commands/update-check.ts
 var import_node_fs4 = __toESM(require("node:fs"), 1);
@@ -12342,10 +12391,23 @@ var SECTION_SCOPES = {
   users: ["user_basic"]
 };
 var USER_SCOPES = ["user", "user_basic", "user_brief"];
-async function status(ctx, check = () => checkForUpdate()) {
+var OTHERS_ACCESS_BITS = 63;
+function envFileMode(envPath = ENV_PATH) {
+  if (process.platform === "win32") return null;
+  try {
+    return import_node_fs5.default.statSync(envPath).mode;
+  } catch {
+    return null;
+  }
+}
+async function status(ctx, deps = {}) {
+  const check = deps.check ?? (() => checkForUpdate());
+  const readMode = deps.envFileMode ?? (() => envFileMode());
   const scopeResp = await ctx.client.call("scope");
-  const granted = (Array.isArray(scopeResp.result) ? scopeResp.result : []).map(String).sort();
+  if (!Array.isArray(scopeResp.result)) throw unexpected2("scope.result");
+  const granted = scopeResp.result.map(String).sort();
   const me = await ctx.client.call("user.current");
+  if (!isObject2(me.result)) throw unexpected2("user.current.result");
   const version = await check();
   const sections = {};
   for (const [section, scopes] of Object.entries(SECTION_SCOPES)) {
@@ -12363,6 +12425,10 @@ async function status(ctx, check = () => checkForUpdate()) {
   }
   if (extra.length > 0) {
     notes.push(`\u041B\u0438\u0448\u043D\u0438\u0435 \u043F\u0440\u0430\u0432\u0430 \u0443 \u0432\u0435\u0431\u0445\u0443\u043A\u0430: ${extra.join(", ")} \u2014 \u0441\u043A\u0438\u043B\u043B\u0443 \u043E\u043D\u0438 \u043D\u0435 \u043D\u0443\u0436\u043D\u044B, \u0438\u0445 \u043C\u043E\u0436\u043D\u043E \u0441\u043D\u044F\u0442\u044C \u0432 \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0430\u0445 \u0432\u0435\u0431\u0445\u0443\u043A\u0430.`);
+  }
+  const mode = readMode();
+  if (mode !== null && (mode & OTHERS_ACCESS_BITS) !== 0) {
+    notes.push(`\u0424\u0430\u0439\u043B \u0441 \u0430\u0434\u0440\u0435\u0441\u043E\u043C \u0432\u0435\u0431\u0445\u0443\u043A\u0430 ${ENV_PATH_DISPLAY} \u0434\u043E\u0441\u0442\u0443\u043F\u0435\u043D \u0434\u0440\u0443\u0433\u0438\u043C \u043F\u043E\u043B\u044C\u0437\u043E\u0432\u0430\u0442\u0435\u043B\u044F\u043C \u044D\u0442\u043E\u0439 \u043C\u0430\u0448\u0438\u043D\u044B. \u0417\u0430\u043A\u0440\u043E\u0439\u0442\u0435 \u0435\u0433\u043E: chmod 600 ${ENV_PATH_DISPLAY}.`);
   }
   if (version.updateAvailable) {
     notes.push(`\u0412\u044B\u0448\u043B\u0430 \u043D\u043E\u0432\u0430\u044F \u0432\u0435\u0440\u0441\u0438\u044F \u0441\u043A\u0438\u043B\u043B\u0430 ${version.latestVersion} (\u0441\u0435\u0439\u0447\u0430\u0441 ${version.currentVersion}). \u041E\u0431\u043D\u043E\u0432\u0438\u0442\u044C: \u043F\u043E\u0432\u0442\u043E\u0440\u0438\u0442\u044C \u0443\u0441\u0442\u0430\u043D\u043E\u0432\u043A\u0443.`);

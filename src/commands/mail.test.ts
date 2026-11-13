@@ -48,6 +48,12 @@ describe('mail', () => {
     expect(String(data[0]?.preview)).toHaveLength(300);
   });
 
+  it('thread — писем столько же, сколько --limit: пометка, что цепочка может быть длиннее', async () => {
+    const { ctx } = fakeContext({ 'mail.message.thread': () => ({ json: { result: [letter(1), letter(2)] } }) });
+    expect((await mailThread(ctx, '1', { limit: '2' })).notes.join(' ')).toContain('--limit');
+    expect((await mailThread(ctx, '1', { limit: '3' })).notes).toEqual([]);
+  });
+
   it('thread — Битрикс отдаёт цепочку просто массивом', async () => {
     const { ctx } = fakeContext({ 'mail.message.thread': () => ({ json: { result: [letter(1), letter(2)] } }) });
     expect(((await mailThread(ctx, '1', {})).data as M[]).map((m) => m.id)).toEqual([1, 2]);

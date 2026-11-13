@@ -42,6 +42,17 @@ describe('disk storages', () => {
 });
 
 describe('disk ls, search, file', () => {
+  it('групп больше 50 — диски показаны только для первых 50, и об этом сказано', async () => {
+    const { ctx, calls } = fakeContext({
+      'sonet_group.user.groups': () => ({ json: { result: Array.from({ length: 60 }, (_, i) => ({ GROUP_ID: String(i + 1) })) } }),
+      'disk.storage.getlist': () => ({ json: { result: [] } }),
+    });
+    const out = await diskStorages(ctx, {});
+    const groupCall = calls.filter((c) => c.method === 'disk.storage.getlist')[2];
+    expect(((groupCall?.body.filter as M)['@ENTITY_ID'] as number[]).length).toBe(50);
+    expect(out.notes.join(' ')).toContain('первых 50 из 60');
+  });
+
   it('ls storage:N / folder:N, без ссылок', async () => {
     const { ctx, calls } = fakeContext({
       'disk.storage.getchildren': () => ({ json: { result: [{ ...fileInfo('a.pdf', 10) }, { ID: '9', NAME: 'Папка', TYPE: 'folder', UPDATE_TIME: 'x', UPDATED_BY: '1' }], next: 50 } }),
@@ -77,6 +88,13 @@ describe('disk ls, search, file', () => {
     expect((second.data as M[])[0]?.name).toBe('f21.pdf');
   });
 
+  it('file — Битрикс вернул пустоту вместо файла: APP_B24_NOT_FOUND', async () => {
+    for (const result of [null, [], {}]) {
+      const { ctx } = fakeContext({ 'disk.file.get': () => ({ json: { result } }) });
+      await expect(diskFile(ctx, '4412')).rejects.toMatchObject({ code: 'APP_B24_NOT_FOUND' });
+    }
+  });
+
   it('file — сведения без ссылок', async () => {
     const { ctx } = fakeContext({ 'disk.file.get': () => ({ json: { result: fileInfo('a.pdf', 10) } }) });
     const out = await diskFile(ctx, '4412');
@@ -110,6 +128,13 @@ describe('disk download', () => {
     const dir = tmp();
     const out = await diskDownload(ctxFor('../../etc/x', 2), '4412', { out: dir });
     expect((out.data as M).path).toBe(path.join(dir, 'x'));
+  });
+
+  it('Битрикс вернул пустоту вместо файла — APP_B24_NOT_FOUND, ничего не скачано', async () => {
+    const dir = tmp();
+    const { ctx } = fakeContext({ 'disk.file.get': () => ({ json: { result: null } }) });
+    await expect(diskDownload(ctx, '4412', { out: dir })).rejects.toMatchObject({ code: 'APP_B24_NOT_FOUND' });
+    expect(fs.readdirSync(dir)).toEqual([]);
   });
 
   it('больше лимита — APP_B24_FILE_TOO_LARGE; без --out и с плохой папкой — свои коды', async () => {

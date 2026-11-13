@@ -48,13 +48,29 @@ describe('bbToText', () => {
     expect(bbToText('пункт [1] и [ссылка] и [OK]')).toBe('пункт [1] и [ссылка] и [OK]');
   });
 
+  it('одиночные [i], [b], [s], [u], [p] без пары — обычный текст, а не разметка', () => {
+    expect(bbToText('в цикле a[i] = b[i] + x[s]; см. пункт [P] и [b], [u]')).toBe('в цикле a[i] = b[i] + x[s]; см. пункт [P] и [b], [u]');
+    expect(bbToText('итог [/b] без начала')).toBe('итог [/b] без начала');
+  });
+
+  it('парное оформление убирается: вложенное и в разном регистре', () => {
+    expect(bbToText('[B][I]важно[/I][/B] и [b]жирно[/B], [s]зачёркнуто[/s], [P]абзац[/P]')).toBe('важно и жирно, зачёркнуто, абзац');
+  });
+
+  it('сотни тысяч знаков с одиночными [i] разбираются быстро', () => {
+    const text = 'a[i] = b[i]; '.repeat(60_000);
+    const started = performance.now();
+    expect(bbToText(text)).toBe(text);
+    expect(performance.now() - started).toBeLessThan(2_000);
+  });
+
   it('property: не падает на любой строке и не оставляет закрывающих тегов из набора', () => {
     const tag = fc.constantFrom('[B]', '[/B]', '[USER=1]', '[/USER]', '[URL=x]', '[/URL]', '[QUOTE]', '[/QUOTE]', '[br]', '[TD]', '[/TD]');
     fc.assert(
       fc.property(fc.array(fc.oneof(fc.string(), tag)), (parts) => {
         const out = bbToText(parts.join(''));
         expect(typeof out).toBe('string');
-        expect(out).not.toMatch(/\[\/(B|USER|URL|CODE)\]/i);
+        expect(out).not.toMatch(/\[\/(USER|URL|CODE)\]/i);
       }),
     );
   });

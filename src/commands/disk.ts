@@ -18,6 +18,7 @@ import {
   envelope,
   isObject,
   type Json,
+  notFound,
   num,
   parseId,
   parseLimit,
@@ -58,11 +59,11 @@ export async function diskStorages(ctx: CommandContext, opts: { all?: boolean; p
     return envelope(asArray(resp.result).filter(isObject).map(storageOf), next, next ? ['Есть ещё хранилища: --page <next>.'] : []);
   }
   const groups = await ctx.client.call<unknown>('sonet_group.user.groups');
-  const groupIds = asArray(groups.result)
+  const allGroupIds = asArray(groups.result)
     .filter(isObject)
     .map((g) => num(g.GROUP_ID))
-    .filter((id): id is number => id !== null)
-    .slice(0, MAX_GROUP_STORAGE_IDS);
+    .filter((id): id is number => id !== null);
+  const groupIds = allGroupIds.slice(0, MAX_GROUP_STORAGE_IDS);
   const own = await ctx.client.call<unknown>('disk.storage.getlist', { filter: { ENTITY_TYPE: 'user', ENTITY_ID: ctx.webhook.userId } });
   const common = await ctx.client.call<unknown>('disk.storage.getlist', { filter: { ENTITY_TYPE: 'common' } });
   const result = [...asArray(own.result), ...asArray(common.result)];
@@ -70,7 +71,11 @@ export async function diskStorages(ctx: CommandContext, opts: { all?: boolean; p
     const group = await ctx.client.call<unknown>('disk.storage.getlist', { filter: { ENTITY_TYPE: 'group', '@ENTITY_ID': groupIds } });
     result.push(...asArray(group.result));
   }
-  return envelope(result.filter(isObject).map(storageOf), null, ['Все хранилища, которые вам видны, — disk storages --all.']);
+  const notes = ['Все хранилища, которые вам видны, — disk storages --all.'];
+  if (allGroupIds.length > groupIds.length) {
+    notes.unshift(`Диски групп показаны только для первых ${groupIds.length} из ${allGroupIds.length} ваших групп; остальные — disk storages --all.`);
+  }
+  return envelope(result.filter(isObject).map(storageOf), null, notes);
 }
 
 export async function diskLs(ctx: CommandContext, target: string, opts: { page?: string }): Promise<Envelope> {
@@ -130,7 +135,9 @@ function fileInfo(f: Json) {
 
 export async function diskFile(ctx: CommandContext, idRaw: string): Promise<Envelope> {
   const resp = await ctx.client.call<Json>('disk.file.get', { id: parseId(idRaw, 'id') });
-  return envelope(fileInfo(isObject(resp.result) ? resp.result : {}));
+  const f = isObject(resp.result) ? resp.result : null;
+  if (!f || num(f.ID) === null) throw notFound();
+  return envelope(fileInfo(f));
 }
 
 // Предел имени в байтах: файловые системы держат 255 байт, а к имени ещё добавятся
@@ -188,7 +195,8 @@ export async function diskDownload(ctx: CommandContext, idRaw: string, opts: { o
   }
   const maxMb = opts.maxMb ? parsePositiveInt(opts.maxMb, '--max-mb', MAX_MB) : DEFAULT_MAX_MB;
   const resp = await ctx.client.call<Json>('disk.file.get', { id: parseId(idRaw, 'id') });
-  const f = isObject(resp.result) ? resp.result : {};
+  const f = isObject(resp.result) ? resp.result : null;
+  if (!f || num(f.ID) === null) throw notFound();
   const size = num(f.SIZE);
   const url = str(f.DOWNLOAD_URL);
   if (size === null || url === '') {

@@ -4,7 +4,8 @@
  * - call(method, params) — старая версия REST: POST <портал>/rest/<id>/<код>/<method>.json;
  * - callV3(method, body) — REST 3.0: POST <портал>/rest/api/<id>/<код>/<method>;
  * - download(url, destPath, expectedSize, maxBytes) — скачивание по подписанной
- *   ссылке DOWNLOAD_URL только с хоста портала.
+ *   ссылке DOWNLOAD_URL только с хоста портала; адрес переадресации проверяется
+ *   так же, до запроса по нему.
  *
  * Перед любым запросом метод сверяется со списком разрешённого (только чтение).
  * Темп — не чаще одного запроса в MIN_REQUEST_INTERVAL_MS. Повторов нет: ошибка
@@ -49,6 +50,8 @@ type Json = Record<string, unknown>;
 function isDownloadPath(pathname: string, webhook: Webhook): boolean {
   return pathname === '/rest/download.json' || pathname === `/rest/${webhook.userId}/${webhook.code}/download/`;
 }
+
+const MAX_DOWNLOAD_REDIRECTS = 3;
 
 function isObject(value: unknown): value is Json {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -213,21 +216,25 @@ export class B24Client {
         cause,
       });
 
-    let parsed: URL;
-    try {
-      parsed = new URL(url);
-    } catch {
-      throw fail('bad-url');
-    }
     // Только подписанная ссылка на скачивание с самого портала. Простые методы
     // Битрикса можно вызвать и GET-запросом, поэтому любой другой путь —
-    // обход списка разрешённого.
-    if (parsed.origin !== this.webhook.origin) {
-      throw fail('foreign-host');
-    }
-    if (!isDownloadPath(parsed.pathname, this.webhook)) {
-      throw fail('not-a-download-link');
-    }
+    // обход списка разрешённого. То же правило — для каждого адреса переадресации.
+    const checkLink = (raw: string, base?: string): URL => {
+      let parsed: URL;
+      try {
+        parsed = new URL(raw, base);
+      } catch {
+        throw fail('bad-url');
+      }
+      if (parsed.origin !== this.webhook.origin) {
+        throw fail('foreign-host');
+      }
+      if (!isDownloadPath(parsed.pathname, this.webhook)) {
+        throw fail('not-a-download-link');
+      }
+      return parsed;
+    };
+    let target = checkLink(url);
 
     await this.pace();
     const tmpPath = `${destPath}.part-${process.pid}-${crypto.randomBytes(4).toString('hex')}`;
@@ -242,26 +249,37 @@ export class B24Client {
     try {
       let response: Response;
       try {
-        response = await this.fetchFn(url, {
-          method: 'GET',
-          redirect: 'follow',
-          headers: {
-            'User-Agent': USER_AGENT,
-            Accept: '*/*',
-            'Accept-Language': 'ru-RU,ru;q=0.9',
-            Referer: `${this.webhook.origin}/`,
-          },
-          signal: controller.signal,
-        });
+        // Переадресацию проходим сами: автоматический переход отправил бы запрос
+        // по новому адресу раньше, чем мы его проверим.
+        for (let hop = 0; ; hop += 1) {
+          response = await this.fetchFn(target.href, {
+            method: 'GET',
+            redirect: 'manual',
+            headers: {
+              'User-Agent': USER_AGENT,
+              Accept: '*/*',
+              'Accept-Language': 'ru-RU,ru;q=0.9',
+              Referer: `${this.webhook.origin}/`,
+            },
+            signal: controller.signal,
+          });
+          if (response.status < 300 || response.status >= 400) {
+            break;
+          }
+          void response.body?.cancel().catch(() => undefined);
+          const location = response.headers.get('location');
+          if (location === null) {
+            throw fail(`status-${response.status}`);
+          }
+          if (hop >= MAX_DOWNLOAD_REDIRECTS) {
+            throw fail('redirect-limit');
+          }
+          target = checkLink(location, target.href);
+        }
       } catch (err) {
-        throw fail('transport', err);
+        throw err instanceof AppError ? err : fail('transport', err);
       } finally {
         clearTimeout(responseTimer);
-      }
-      const finalUrl = response.url === '' ? url : response.url;
-      if (new URL(finalUrl).origin !== this.webhook.origin) {
-        void response.body?.cancel().catch(() => undefined);
-        throw fail('redirect-foreign-host');
       }
       if (response.status !== 200 || !response.body) {
         void response.body?.cancel().catch(() => undefined);

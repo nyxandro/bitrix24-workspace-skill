@@ -161,7 +161,9 @@ export async function tasksGet(ctx: CommandContext, idRaw: string, opts: { full?
   const text = bbToText(rawDescription, new Map(), ctx.tz);
   const description = opts.full ? { text, truncated: false } : truncate(text, MAX_TEXT_CHARS);
   const linkedDialogs = [...new Set([...rawDescription.matchAll(IM_DIALOG_RE)].map((m) => m[1] as string))];
-  const chatId = num(t.chatId);
+  // У задачи без чата Битрикс может отдать 0 — это тоже «чата нет».
+  const rawChatId = num(t.chatId);
+  const chatId = rawChatId !== null && rawChatId > 0 ? rawChatId : null;
   const checklistResp = await ctx.client.call<unknown>('task.checklistitem.getlist', { TASKID: id });
   const checklist = asArray(checklistResp.result)
     .filter(isObject)

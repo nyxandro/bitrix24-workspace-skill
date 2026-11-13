@@ -309,15 +309,58 @@ describe('B24Client.download', () => {
     expect(fetchFn).not.toHaveBeenCalled();
   });
 
-  it('переадресация на чужой хост — отказ, файла нет', async () => {
+  const redirectTo = (location: string) => new Response(null, { status: 302, headers: { Location: location } });
+
+  it.each([
+    ['на чужой хост', 'https://evil.example.com/file'],
+    ['на метод портала', 'https://example.bitrix24.ru/rest/1/testsecret0000/im.message.add.json?DIALOG_ID=chat1&MESSAGE=x'],
+    ['на другую страницу портала', '/company/personal/user/1/'],
+  ])('переадресация %s — отказ: по новому адресу запрос не уходит, файла нет', async (_name, location) => {
     const dir = tmp();
-    const fetchFn = vi.fn(async () => {
-      const res = new Response(streamOf([new Uint8Array([1, 2, 3])]), { status: 200 });
-      Object.defineProperty(res, 'url', { value: 'https://evil.example.com/file' });
-      return res;
-    });
+    const fetchFn = vi.fn(async () => redirectTo(location));
     const { client } = makeClient(fetchFn as unknown as typeof fetch);
     expect(await codeOf(client.download(LINK, path.join(dir, 'x.pdf'), 3, 100))).toBe('APP_B24_DOWNLOAD_FAILED');
+    expect(fetchFn).toHaveBeenCalledTimes(1);
+    expect((fetchFn.mock.calls[0] as unknown as [string, RequestInit])[1].redirect).toBe('manual');
+    expect(fs.readdirSync(dir)).toEqual([]);
+  });
+
+  it('переадресация на другую ссылку скачивания того же портала — идём по ней', async () => {
+    const dir = tmp();
+    const real = 'https://example.bitrix24.ru/rest/1/testsecret0000/download/?token=filetoken0000';
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValueOnce(redirectTo(real))
+      .mockResolvedValueOnce(new Response(streamOf([new Uint8Array([1, 2, 3])]), { status: 200 }));
+    const { client } = makeClient(fetchFn as unknown as typeof fetch);
+    expect(await client.download(LINK, path.join(dir, 'x.pdf'), 3, 100)).toMatchObject({ size: 3 });
+    expect((fetchFn.mock.calls[1] as unknown as [string])[0]).toBe(real);
+  });
+
+  it('бесконечная переадресация — отказ после нескольких шагов', async () => {
+    const fetchFn = vi.fn(async () => redirectTo(LINK));
+    const { client } = makeClient(fetchFn as unknown as typeof fetch);
+    expect(await codeOf(client.download(LINK, path.join(tmp(), 'x.pdf'), 3, 100))).toBe('APP_B24_DOWNLOAD_FAILED');
+    // Исходный запрос и три шага переадресации — четвёртого шага нет.
+    expect(fetchFn).toHaveBeenCalledTimes(4);
+  });
+
+  it('относительный адрес переадресации разбирается от текущего', async () => {
+    const fetchFn = vi
+      .fn()
+      .mockResolvedValueOnce(redirectTo('/rest/download.json?auth[auth]=filetoken0000&id=6'))
+      .mockResolvedValueOnce(new Response(streamOf([new Uint8Array([1, 2, 3])]), { status: 200 }));
+    const { client } = makeClient(fetchFn as unknown as typeof fetch);
+    expect(await client.download(LINK, path.join(tmp(), 'x.pdf'), 3, 100)).toMatchObject({ size: 3 });
+    expect((fetchFn.mock.calls[1] as unknown as [string])[0]).toBe('https://example.bitrix24.ru/rest/download.json?auth[auth]=filetoken0000&id=6');
+  });
+
+  it('ответ 3xx без адреса переадресации — отказ, файла нет', async () => {
+    const dir = tmp();
+    const fetchFn = vi.fn(async () => new Response(null, { status: 304 }));
+    const { client } = makeClient(fetchFn as unknown as typeof fetch);
+    expect(await codeOf(client.download(LINK, path.join(dir, 'x.pdf'), 3, 100))).toBe('APP_B24_DOWNLOAD_FAILED');
+    expect(fetchFn).toHaveBeenCalledTimes(1);
     expect(fs.readdirSync(dir)).toEqual([]);
   });
 

@@ -4,17 +4,52 @@
  * - bbToText(raw, users) — разметка BB-кодов: упоминания → «@имя», ссылки →
  *   «текст (адрес)», цитаты → строки с «> », оформление убирается, частые
  *   HTML-сущности раскодируются. Квадратные скобки в обычном тексте не трогаем:
- *   вырезаются только известные теги Битрикса.
+ *   вырезаются только известные теги Битрикса, а однобуквенные ([b], [i], [u],
+ *   [s], [p]) — только парой: одиночное «a[i]» — это текст, а не курсив.
  * - isSystemMessage(msg) — служебные события (вход/выход, автор 0).
  * - truncate(text, max) — обрезка по символам без разрезания эмодзи.
  */
 
+import { formatInZone, machineTimeZone } from './dates.js';
+
 const KNOWN_TAGS = [
-  'B', 'I', 'U', 'S', 'COLOR', 'SIZE', 'FONT', 'ICON', 'LEFT', 'RIGHT', 'CENTER', 'JUSTIFY',
-  'IMG', 'VIDEO', 'SPOILER', 'P', 'HR', 'PCH', 'ATTACH', 'DISK', 'CONTEXT', 'SEND', 'PUT', 'CALL',
+  'COLOR', 'SIZE', 'FONT', 'ICON', 'LEFT', 'RIGHT', 'CENTER', 'JUSTIFY',
+  'IMG', 'VIDEO', 'SPOILER', 'HR', 'PCH', 'ATTACH', 'DISK', 'CONTEXT', 'SEND', 'PUT', 'CALL',
   'CHAT', 'LIKE', 'DATE', 'BOT',
 ];
-import { formatInZone, machineTimeZone } from './dates.js';
+// Однобуквенные теги совпадают с обычным текстом (индексы «a[i]», «x[s]»), поэтому
+// убираются только открывающий вместе с закрывающим.
+const PAIRED_TAG_RE = /\[(\/?)([BIUSP])\]/gi;
+
+// Один проход со стеком открытых тегов по каждой букве: время растёт линейно и
+// на тексте в сотни тысяч знаков с множеством одиночных «[i]».
+function stripPairedTags(text: string): string {
+  const tags = [...text.matchAll(PAIRED_TAG_RE)];
+  const open = new Map<string, number[]>();
+  const paired = new Set<number>();
+  tags.forEach((tag, i) => {
+    const letter = (tag[2] as string).toUpperCase();
+    const stack = open.get(letter) ?? [];
+    open.set(letter, stack);
+    if (tag[1] === '') {
+      stack.push(i);
+      return;
+    }
+    const opener = stack.pop();
+    if (opener !== undefined) {
+      paired.add(opener).add(i);
+    }
+  });
+  if (paired.size === 0) return text;
+  let out = '';
+  let pos = 0;
+  tags.forEach((tag, i) => {
+    if (!paired.has(i)) return;
+    out += text.slice(pos, tag.index);
+    pos = tag.index + tag[0].length;
+  });
+  return out + text.slice(pos);
+}
 
 const KNOWN_TAG_RE = new RegExp(`\\[\\/?(?:${KNOWN_TAGS.join('|')})(?:=[^\\]]*)?(?:\\s[^\\]]*)?\\]`, 'gi');
 
@@ -76,7 +111,7 @@ export function bbToText(
       .join('\n')
       .concat('\n'),
   );
-  text = text.replace(KNOWN_TAG_RE, '');
+  text = stripPairedTags(text.replace(KNOWN_TAG_RE, ''));
   // Остатки известных парных тегов, которые не сошлись (незакрытые упоминания и ссылки).
   text = text.replace(/\[\/?(?:USER|URL|QUOTE)(?:=[^\]]*)?(?:\s[^\]]*)?\]/gi, '');
   text = text.replace(/&(?:amp|lt|gt|quot|nbsp|#0?39);/g, (entity) => ENTITIES[entity] ?? entity);

@@ -13,6 +13,7 @@ import { truncate } from '../render/text.js';
 import { asArray, type CommandContext, decodeCursor, encodeCursor, envelope, isObject, type Json, notFound, num, parseId, parseLimit, str } from './common.js';
 
 const PREVIEW_CHARS = 300;
+const MAX_THREAD = 50;
 // Курсор помнит и размер страницы: страница N при другом --limit указывала бы на другие письма.
 const isPageCursor = (v: unknown): v is { p: number; l: number } =>
   isObject(v) && Number.isSafeInteger(v.p) && (v.p as number) >= 1 && Number.isSafeInteger(v.l) && (v.l as number) >= 1;
@@ -83,11 +84,12 @@ export async function mailGet(ctx: CommandContext, idRaw: string, opts: { full?:
 }
 
 export async function mailThread(ctx: CommandContext, idRaw: string, opts: { limit?: string }): Promise<Envelope> {
-  const limit = parseLimit(opts.limit, 20, 50);
+  const limit = parseLimit(opts.limit, 20, MAX_THREAD);
   // Цепочку Битрикс отдаёт просто массивом писем, а не объектом {items} (проверено на портале).
   const resp = await ctx.client.callV3<unknown>('mail.message.thread', { id: parseId(idRaw, 'id'), limit });
   const data = (Array.isArray(resp) ? resp : asArray(isObject(resp) ? resp.items : []))
     .filter(isObject)
     .map((m) => ({ id: num(m.id), subject: str(m.subject), from: address(m.from), date: mailDate(m.date), preview: truncate(mailBodyToText(str(m.body)), PREVIEW_CHARS).text }));
-  return envelope(data);
+  // Общего числа писем цепочки Битрикс не сообщает: полная страница — признак, что есть ещё.
+  return envelope(data, null, data.length >= limit ? [`Показаны ${data.length} писем — цепочка может быть длиннее${limit < MAX_THREAD ? `; увеличьте --limit (до ${MAX_THREAD})` : ', но больше команда не показывает'}.`] : []);
 }

@@ -60,6 +60,13 @@ describe('install.sh', () => {
     expect(fs.existsSync(path.join(home, '.claude/skills/bitrix24-workspace/SKILL.md'))).toBe(true);
   });
 
+  it('--help работает и при запуске из потока (curl … | bash), когда файла скрипта нет', () => {
+    const script = fs.readFileSync(path.join(ROOT, 'install.sh'), 'utf8');
+    const out = execFileSync('bash', ['-s', '--', '--help'], { input: script, env: { ...process.env, HOME: tmp('b24-home-') }, encoding: 'utf8' });
+    expect(out).toContain('--file');
+    expect(out).toContain('--dir');
+  });
+
   it('не архив скилла — понятная ошибка', () => {
     const home = tmp('b24-home-');
     const bad = path.join(tmp('b24-arc-'), 'bad.skill');
