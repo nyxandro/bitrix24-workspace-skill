@@ -1,0 +1,25 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      # install.sh ставится из main, поэтому собранный файл в репозитории обязан
+      # соответствовать исходникам: пересобираем и сверяем.
+      - run: npm run build:skill
+      - name: Собранный b24.cjs соответствует исходникам
+        run: git diff --exit-code -- skills/bitrix24-workspace/scripts/b24.cjs
+      # Тесты заодно сверяют архив .skill с папкой скилла и номер версии во всех файлах.
+      - run: npm test
