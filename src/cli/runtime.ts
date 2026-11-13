@@ -8,14 +8,19 @@
  * - formatError(err, secrets, debug) — строки для stderr: русский текст и код,
  *   детали только в отладке, всё через redact();
  * - reportError(err) — единая граница ошибок: печать и код выхода 1;
+ * - runCommand(fn) — запуск команды: вебхук → клиент → ответ → проверка вывода → stdout;
  * - parsePositiveInt(raw, optionName, max?) — строгая десятичная проверка чисел.
  */
 import dotenv from 'dotenv';
 import fs from 'node:fs';
+import { B24Client } from '../api/client.js';
 import { AppError } from '../api/errors.js';
 import { redact } from '../api/redact.js';
+import type { CommandContext } from '../commands/common.js';
 import { DEBUG_ENV, ENV_PATH, ENV_PATH_DISPLAY, WEBHOOK_ENV } from '../config/config.js';
 import { parseWebhook, type Webhook } from '../config/webhook.js';
+import { machineTimeZone } from '../render/dates.js';
+import { type Envelope, finalizeOutput } from '../render/output.js';
 
 // Разбираем файл сами (dotenv.parse), а не dotenv.config: config умеет печатать
 // служебные строки в stdout и переключаться в другие режимы по переменным
@@ -124,3 +129,13 @@ export function parsePositiveInt(raw: string, optionName: string, max?: number):
   }
   return value;
 }
+
+export type Runner = (fn: (ctx: CommandContext) => Promise<Envelope>) => Promise<void>;
+
+// Запуск команды. Ответ печатается только после финальной проверки на ключи.
+export const runCommand: Runner = async (fn) => {
+  const webhook = loadWebhook();
+  const client = new B24Client({ webhook });
+  const result = await fn({ client, webhook, tz: machineTimeZone() });
+  process.stdout.write(`${finalizeOutput(result, secretsFromEnv())}\n`);
+};

@@ -93,7 +93,7 @@ describe('выход в сеть', () => {
     const path = await import('node:path');
     const srcDir = path.resolve(import.meta.dirname, '..');
     const files = (fs.readdirSync(srcDir, { recursive: true }) as string[])
-      .filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'))
+      .filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts') && !f.endsWith('testkit.ts'))
       .map((f) => f.split(path.sep).join('/'));
     const code = new Map(files.map((f) => [f, stripComments(fs.readFileSync(path.join(srcDir, f), 'utf8'))]));
     const fetchUsers = files.filter((f) => FETCH_USE.test(code.get(f) ?? ''));

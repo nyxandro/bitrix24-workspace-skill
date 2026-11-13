@@ -626,8 +626,8 @@ var require_help = __commonJS({
        * @param {string} str
        * @returns {number}
        */
-      displayWidth(str) {
-        return stripColor(str).length;
+      displayWidth(str2) {
+        return stripColor(str2).length;
       }
       /**
        * Style the title for displaying in the help. Called with 'Usage:', 'Options:', etc.
@@ -635,11 +635,11 @@ var require_help = __commonJS({
        * @param {string} str
        * @returns {string}
        */
-      styleTitle(str) {
-        return str;
+      styleTitle(str2) {
+        return str2;
       }
-      styleUsage(str) {
-        return str.split(" ").map((word) => {
+      styleUsage(str2) {
+        return str2.split(" ").map((word) => {
           if (word === "[options]") return this.styleOptionText(word);
           if (word === "[command]") return this.styleSubcommandText(word);
           if (word[0] === "[" || word[0] === "<")
@@ -647,46 +647,46 @@ var require_help = __commonJS({
           return this.styleCommandText(word);
         }).join(" ");
       }
-      styleCommandDescription(str) {
-        return this.styleDescriptionText(str);
+      styleCommandDescription(str2) {
+        return this.styleDescriptionText(str2);
       }
-      styleOptionDescription(str) {
-        return this.styleDescriptionText(str);
+      styleOptionDescription(str2) {
+        return this.styleDescriptionText(str2);
       }
-      styleSubcommandDescription(str) {
-        return this.styleDescriptionText(str);
+      styleSubcommandDescription(str2) {
+        return this.styleDescriptionText(str2);
       }
-      styleArgumentDescription(str) {
-        return this.styleDescriptionText(str);
+      styleArgumentDescription(str2) {
+        return this.styleDescriptionText(str2);
       }
-      styleDescriptionText(str) {
-        return str;
+      styleDescriptionText(str2) {
+        return str2;
       }
-      styleOptionTerm(str) {
-        return this.styleOptionText(str);
+      styleOptionTerm(str2) {
+        return this.styleOptionText(str2);
       }
-      styleSubcommandTerm(str) {
-        return str.split(" ").map((word) => {
+      styleSubcommandTerm(str2) {
+        return str2.split(" ").map((word) => {
           if (word === "[options]") return this.styleOptionText(word);
           if (word[0] === "[" || word[0] === "<")
             return this.styleArgumentText(word);
           return this.styleSubcommandText(word);
         }).join(" ");
       }
-      styleArgumentTerm(str) {
-        return this.styleArgumentText(str);
+      styleArgumentTerm(str2) {
+        return this.styleArgumentText(str2);
       }
-      styleOptionText(str) {
-        return str;
+      styleOptionText(str2) {
+        return str2;
       }
-      styleArgumentText(str) {
-        return str;
+      styleArgumentText(str2) {
+        return str2;
       }
-      styleSubcommandText(str) {
-        return str;
+      styleSubcommandText(str2) {
+        return str2;
       }
-      styleCommandText(str) {
-        return str;
+      styleCommandText(str2) {
+        return str2;
       }
       /**
        * Calculate the pad width from the maximum term length.
@@ -709,8 +709,8 @@ var require_help = __commonJS({
        * @param {string} str
        * @returns {boolean}
        */
-      preformatted(str) {
-        return /\n[^\S\r\n]/.test(str);
+      preformatted(str2) {
+        return /\n[^\S\r\n]/.test(str2);
       }
       /**
        * Format the "item", which consists of a term and description. Pad the term and wrap the description, indenting the following lines.
@@ -756,9 +756,9 @@ ${itemIndentStr}`);
        * @param {number} width
        * @returns {string}
        */
-      boxWrap(str, width) {
-        if (width < this.minWidthToWrap) return str;
-        const rawLines = str.split(/\r\n|\n/);
+      boxWrap(str2, width) {
+        if (width < this.minWidthToWrap) return str2;
+        const rawLines = str2.split(/\r\n|\n/);
         const chunkPattern = /[\s]*[^\s]+/g;
         const wrappedLines = [];
         rawLines.forEach((line) => {
@@ -786,9 +786,9 @@ ${itemIndentStr}`);
         return wrappedLines.join("\n");
       }
     };
-    function stripColor(str) {
+    function stripColor(str2) {
       const sgrPattern = /\x1b\[\d*(;\d*)*m/g;
-      return str.replace(sgrPattern, "");
+      return str2.replace(sgrPattern, "");
     }
     exports2.Help = Help2;
     exports2.stripColor = stripColor;
@@ -1059,9 +1059,9 @@ var require_option = __commonJS({
         return option.negate === (negativeValue === value);
       }
     };
-    function camelcase(str) {
-      return str.split("-").reduce((str2, word) => {
-        return str2 + word[0].toUpperCase() + word.slice(1);
+    function camelcase(str2) {
+      return str2.split("-").reduce((str3, word) => {
+        return str3 + word[0].toUpperCase() + word.slice(1);
       });
     }
     function splitOptionFlags(flags) {
@@ -1193,8 +1193,8 @@ var require_command = __commonJS({
   "node_modules/commander/lib/command.js"(exports2) {
     var EventEmitter = require("node:events").EventEmitter;
     var childProcess = require("node:child_process");
-    var path2 = require("node:path");
-    var fs2 = require("node:fs");
+    var path4 = require("node:path");
+    var fs4 = require("node:fs");
     var process2 = require("node:process");
     var { Argument: Argument2, humanReadableArgName } = require_argument();
     var { CommanderError: CommanderError2 } = require_error();
@@ -1242,14 +1242,14 @@ var require_command = __commonJS({
         this._showSuggestionAfterError = true;
         this._savedState = null;
         this._outputConfiguration = {
-          writeOut: (str) => process2.stdout.write(str),
-          writeErr: (str) => process2.stderr.write(str),
-          outputError: (str, write) => write(str),
+          writeOut: (str2) => process2.stdout.write(str2),
+          writeErr: (str2) => process2.stderr.write(str2),
+          outputError: (str2, write) => write(str2),
           getOutHelpWidth: () => process2.stdout.isTTY ? process2.stdout.columns : void 0,
           getErrHelpWidth: () => process2.stderr.isTTY ? process2.stderr.columns : void 0,
           getOutHasColors: () => useColor() ?? (process2.stdout.isTTY && process2.stdout.hasColors?.()),
           getErrHasColors: () => useColor() ?? (process2.stderr.isTTY && process2.stderr.hasColors?.()),
-          stripColor: (str) => stripColor(str)
+          stripColor: (str2) => stripColor(str2)
         };
         this._hidden = false;
         this._helpOption = void 0;
@@ -2188,7 +2188,7 @@ Expecting one of '${allowedValues.join("', '")}'`);
        * @param {string} subcommandName
        */
       _checkForMissingExecutable(executableFile, executableDir, subcommandName) {
-        if (fs2.existsSync(executableFile)) return;
+        if (fs4.existsSync(executableFile)) return;
         const executableDirMessage = executableDir ? `searched for local subcommand relative to directory '${executableDir}'` : "no directory for search for local subcommand, use .executableDir() to supply a custom directory";
         const executableMissing = `'${executableFile}' does not exist
  - if '${subcommandName}' is not meant to be an executable command, remove description parameter from '.command()' and use '.description()' instead
@@ -2206,11 +2206,11 @@ Expecting one of '${allowedValues.join("', '")}'`);
         let launchWithNode = false;
         const sourceExt = [".js", ".ts", ".tsx", ".mjs", ".cjs"];
         function findFile(baseDir, baseName) {
-          const localBin = path2.resolve(baseDir, baseName);
-          if (fs2.existsSync(localBin)) return localBin;
-          if (sourceExt.includes(path2.extname(baseName))) return void 0;
+          const localBin = path4.resolve(baseDir, baseName);
+          if (fs4.existsSync(localBin)) return localBin;
+          if (sourceExt.includes(path4.extname(baseName))) return void 0;
           const foundExt = sourceExt.find(
-            (ext) => fs2.existsSync(`${localBin}${ext}`)
+            (ext) => fs4.existsSync(`${localBin}${ext}`)
           );
           if (foundExt) return `${localBin}${foundExt}`;
           return void 0;
@@ -2222,21 +2222,21 @@ Expecting one of '${allowedValues.join("', '")}'`);
         if (this._scriptPath) {
           let resolvedScriptPath;
           try {
-            resolvedScriptPath = fs2.realpathSync(this._scriptPath);
+            resolvedScriptPath = fs4.realpathSync(this._scriptPath);
           } catch {
             resolvedScriptPath = this._scriptPath;
           }
-          executableDir = path2.resolve(
-            path2.dirname(resolvedScriptPath),
+          executableDir = path4.resolve(
+            path4.dirname(resolvedScriptPath),
             executableDir
           );
         }
         if (executableDir) {
           let localFile = findFile(executableDir, executableFile);
           if (!localFile && !subcommand._executableFile && this._scriptPath) {
-            const legacyName = path2.basename(
+            const legacyName = path4.basename(
               this._scriptPath,
-              path2.extname(this._scriptPath)
+              path4.extname(this._scriptPath)
             );
             if (legacyName !== this._name) {
               localFile = findFile(
@@ -2247,7 +2247,7 @@ Expecting one of '${allowedValues.join("', '")}'`);
           }
           executableFile = localFile || executableFile;
         }
-        launchWithNode = sourceExt.includes(path2.extname(executableFile));
+        launchWithNode = sourceExt.includes(path4.extname(executableFile));
         let proc;
         if (process2.platform !== "win32") {
           if (launchWithNode) {
@@ -2973,18 +2973,18 @@ Expecting one of '${allowedValues.join("', '")}'`);
        * @param {string} [description]
        * @return {(this | string | undefined)} `this` command for chaining, or version string if no arguments
        */
-      version(str, flags, description) {
-        if (str === void 0) return this._version;
-        this._version = str;
+      version(str2, flags, description) {
+        if (str2 === void 0) return this._version;
+        this._version = str2;
         flags = flags || "-V, --version";
         description = description || "output the version number";
         const versionOption = this.createOption(flags, description);
         this._versionOptionName = versionOption.attributeName();
         this._registerOption(versionOption);
         this.on("option:" + versionOption.name(), () => {
-          this._outputConfiguration.writeOut(`${str}
+          this._outputConfiguration.writeOut(`${str2}
 `);
-          this._exit(0, "commander.version", str);
+          this._exit(0, "commander.version", str2);
         });
         return this;
       }
@@ -2995,10 +2995,10 @@ Expecting one of '${allowedValues.join("', '")}'`);
        * @param {object} [argsDescription]
        * @return {(string|Command)}
        */
-      description(str, argsDescription) {
-        if (str === void 0 && argsDescription === void 0)
+      description(str2, argsDescription) {
+        if (str2 === void 0 && argsDescription === void 0)
           return this._description;
-        this._description = str;
+        this._description = str2;
         if (argsDescription) {
           this._argsDescription = argsDescription;
         }
@@ -3010,9 +3010,9 @@ Expecting one of '${allowedValues.join("', '")}'`);
        * @param {string} [str]
        * @return {(string|Command)}
        */
-      summary(str) {
-        if (str === void 0) return this._summary;
-        this._summary = str;
+      summary(str2) {
+        if (str2 === void 0) return this._summary;
+        this._summary = str2;
         return this;
       }
       /**
@@ -3060,8 +3060,8 @@ Expecting one of '${allowedValues.join("', '")}'`);
        * @param {string} [str]
        * @return {(string|Command)}
        */
-      usage(str) {
-        if (str === void 0) {
+      usage(str2) {
+        if (str2 === void 0) {
           if (this._usage) return this._usage;
           const args = this.registeredArguments.map((arg) => {
             return humanReadableArgName(arg);
@@ -3072,7 +3072,7 @@ Expecting one of '${allowedValues.join("', '")}'`);
             this.registeredArguments.length ? args : []
           ).join(" ");
         }
-        this._usage = str;
+        this._usage = str2;
         return this;
       }
       /**
@@ -3081,9 +3081,9 @@ Expecting one of '${allowedValues.join("', '")}'`);
        * @param {string} [str]
        * @return {(string|Command)}
        */
-      name(str) {
-        if (str === void 0) return this._name;
-        this._name = str;
+      name(str2) {
+        if (str2 === void 0) return this._name;
+        this._name = str2;
         return this;
       }
       /**
@@ -3162,7 +3162,7 @@ Expecting one of '${allowedValues.join("', '")}'`);
        * @return {Command}
        */
       nameFromFilename(filename) {
-        this._name = path2.basename(filename, path2.extname(filename));
+        this._name = path4.basename(filename, path4.extname(filename));
         return this;
       }
       /**
@@ -3176,9 +3176,9 @@ Expecting one of '${allowedValues.join("', '")}'`);
        * @param {string} [path]
        * @return {(string|null|Command)}
        */
-      executableDir(path3) {
-        if (path3 === void 0) return this._executableDir;
-        this._executableDir = path3;
+      executableDir(path5) {
+        if (path5 === void 0) return this._executableDir;
+        this._executableDir = path5;
         return this;
       }
       /**
@@ -3217,17 +3217,17 @@ Expecting one of '${allowedValues.join("', '")}'`);
         let hasColors;
         let helpWidth;
         if (error) {
-          baseWrite = (str) => this._outputConfiguration.writeErr(str);
+          baseWrite = (str2) => this._outputConfiguration.writeErr(str2);
           hasColors = this._outputConfiguration.getErrHasColors();
           helpWidth = this._outputConfiguration.getErrHelpWidth();
         } else {
-          baseWrite = (str) => this._outputConfiguration.writeOut(str);
+          baseWrite = (str2) => this._outputConfiguration.writeOut(str2);
           hasColors = this._outputConfiguration.getOutHasColors();
           helpWidth = this._outputConfiguration.getOutHelpWidth();
         }
-        const write = (str) => {
-          if (!hasColors) str = this._outputConfiguration.stripColor(str);
-          return baseWrite(str);
+        const write = (str2) => {
+          if (!hasColors) str2 = this._outputConfiguration.stripColor(str2);
+          return baseWrite(str2);
         };
         return { error, write, hasColors, helpWidth };
       }
@@ -3459,10 +3459,10 @@ var require_commander = __commonJS({
 // node_modules/dotenv/lib/main.js
 var require_main = __commonJS({
   "node_modules/dotenv/lib/main.js"(exports2, module2) {
-    var fs2 = require("fs");
-    var path2 = require("path");
+    var fs4 = require("fs");
+    var path4 = require("path");
     var os2 = require("os");
-    var crypto = require("crypto");
+    var crypto2 = require("crypto");
     var TIPS = [
       "\u25C8 encrypted .env [www.dotenvx.com]",
       "\u25C8 secrets for agents [www.dotenvx.com]",
@@ -3591,7 +3591,7 @@ var require_main = __commonJS({
       if (options && options.path && options.path.length > 0) {
         if (Array.isArray(options.path)) {
           for (const filepath of options.path) {
-            if (fs2.existsSync(filepath)) {
+            if (fs4.existsSync(filepath)) {
               possibleVaultPath = filepath.endsWith(".vault") ? filepath : `${filepath}.vault`;
             }
           }
@@ -3599,15 +3599,15 @@ var require_main = __commonJS({
           possibleVaultPath = options.path.endsWith(".vault") ? options.path : `${options.path}.vault`;
         }
       } else {
-        possibleVaultPath = path2.resolve(process.cwd(), ".env.vault");
+        possibleVaultPath = path4.resolve(process.cwd(), ".env.vault");
       }
-      if (fs2.existsSync(possibleVaultPath)) {
+      if (fs4.existsSync(possibleVaultPath)) {
         return possibleVaultPath;
       }
       return null;
     }
     function _resolveHome(envPath) {
-      return envPath[0] === "~" ? path2.join(os2.homedir(), envPath.slice(1)) : envPath;
+      return envPath[0] === "~" ? path4.join(os2.homedir(), envPath.slice(1)) : envPath;
     }
     function _configVault(options) {
       const debug = parseBoolean(process.env.DOTENV_CONFIG_DEBUG || options && options.debug);
@@ -3624,7 +3624,7 @@ var require_main = __commonJS({
       return { parsed };
     }
     function configDotenv(options) {
-      const dotenvPath = path2.resolve(process.cwd(), ".env");
+      const dotenvPath = path4.resolve(process.cwd(), ".env");
       let encoding = "utf8";
       let processEnv = process.env;
       if (options && options.processEnv != null) {
@@ -3652,13 +3652,13 @@ var require_main = __commonJS({
       }
       let lastError;
       const parsedAll = {};
-      for (const path3 of optionPaths) {
+      for (const path5 of optionPaths) {
         try {
-          const parsed = DotenvModule.parse(fs2.readFileSync(path3, { encoding }));
+          const parsed = DotenvModule.parse(fs4.readFileSync(path5, { encoding }));
           DotenvModule.populate(parsedAll, parsed, options);
         } catch (e) {
           if (debug) {
-            _debug(`failed to load ${path3} ${e.message}`);
+            _debug(`failed to load ${path5} ${e.message}`);
           }
           lastError = e;
         }
@@ -3671,7 +3671,7 @@ var require_main = __commonJS({
         const shortPaths = [];
         for (const filePath of optionPaths) {
           try {
-            const relative = path2.relative(process.cwd(), filePath);
+            const relative = path4.relative(process.cwd(), filePath);
             shortPaths.push(relative);
           } catch (e) {
             if (debug) {
@@ -3706,7 +3706,7 @@ var require_main = __commonJS({
       const authTag = ciphertext.subarray(-16);
       ciphertext = ciphertext.subarray(12, -16);
       try {
-        const aesgcm = crypto.createDecipheriv("aes-256-gcm", key, nonce);
+        const aesgcm = crypto2.createDecipheriv("aes-256-gcm", key, nonce);
         aesgcm.setAuthTag(authTag);
         return `${aesgcm.update(ciphertext)}${aesgcm.final()}`;
       } catch (error) {
@@ -3792,6 +3792,20 @@ var {
   Help
 } = import_index.default;
 
+// src/api/errors.ts
+var AppError = class extends Error {
+  code;
+  userMessage;
+  details;
+  constructor(params) {
+    super(`${params.code}: ${params.userMessage}`, { cause: params.cause });
+    this.name = "AppError";
+    this.code = params.code;
+    this.userMessage = params.userMessage;
+    this.details = params.details;
+  }
+};
+
 // src/config/config.ts
 var import_node_os = __toESM(require("node:os"), 1);
 var import_node_path = __toESM(require("node:path"), 1);
@@ -3804,31 +3818,645 @@ var ENV_PATH_DISPLAY = "~/.config/bitrix24-workspace/.env";
 var WEBHOOK_ENV = "BITRIX24_WORKSPACE_WEBHOOK_URL";
 var DEBUG_ENV = "B24_DEBUG";
 var USER_AGENT = `${APP_NAME}/${APP_VERSION}`;
+var MIN_REQUEST_INTERVAL_MS = 500;
+var REQUEST_TIMEOUT_MS = 6e4;
+var DOWNLOAD_IDLE_TIMEOUT_MS = 6e4;
+var UPDATE_CHECK_URL = "https://raw.githubusercontent.com/nyxandro/bitrix24-workspace-skill/main/package.json";
+var UPDATE_CHECK_TTL_MS = 24 * 60 * 60 * 1e3;
+var UPDATE_CHECK_TIMEOUT_MS = 2500;
+var UPDATE_CHECK_CACHE_PATH = import_node_path.default.join(CONFIG_DIR, "update-check.json");
 
-// src/cli/program.ts
-function buildProgram() {
-  const program2 = new Command();
-  program2.name(CLI_NAME).description(
-    "\u0411\u0438\u0442\u0440\u0438\u043A\u044124 \u0442\u043E\u043B\u044C\u043A\u043E \u043D\u0430 \u0447\u0442\u0435\u043D\u0438\u0435: \u0447\u0430\u0442\u044B, \u0437\u0430\u0434\u0430\u0447\u0438, \u043F\u0440\u043E\u0435\u043A\u0442\u044B, \u0434\u0438\u0441\u043A, \u043F\u043E\u0447\u0442\u0430, \u043A\u0430\u043B\u0435\u043D\u0434\u0430\u0440\u044C, \u0432\u0441\u0442\u0440\u0435\u0447\u0438, \u043B\u0435\u043D\u0442\u0430, \u0431\u0430\u0437\u0430 \u0437\u043D\u0430\u043D\u0438\u0439. \u0412\u044B\u0432\u043E\u0434 \u2014 JSON."
-  ).version(APP_VERSION);
-  return program2;
+// src/commands/update-check.ts
+var import_node_fs = __toESM(require("node:fs"), 1);
+var import_node_path2 = __toESM(require("node:path"), 1);
+function parseVersion(value) {
+  const normalized = value.trim().replace(/^v/i, "");
+  return /^\d+(\.\d+)*$/.test(normalized) ? normalized.split(".").map(Number) : null;
+}
+function isNewer(latest, current) {
+  const a = parseVersion(latest);
+  const b = parseVersion(current);
+  if (!a || !b) {
+    return false;
+  }
+  for (let i = 0; i < Math.max(a.length, b.length); i++) {
+    const x = a[i] ?? 0;
+    const y = b[i] ?? 0;
+    if (x !== y) {
+      return x > y;
+    }
+  }
+  return false;
+}
+function readCache(file) {
+  try {
+    const parsed = JSON.parse(import_node_fs.default.readFileSync(file, "utf8"));
+    return typeof parsed.checkedAt === "string" && typeof parsed.latestVersion === "string" ? { checkedAt: parsed.checkedAt, latestVersion: parsed.latestVersion } : null;
+  } catch {
+    return null;
+  }
+}
+function writeCache(file, cache) {
+  try {
+    import_node_fs.default.mkdirSync(import_node_path2.default.dirname(file), { recursive: true, mode: 448 });
+    import_node_fs.default.writeFileSync(file, JSON.stringify(cache), "utf8");
+  } catch {
+  }
+}
+async function fetchLatest(fetchFn) {
+  try {
+    const response = await fetchFn(UPDATE_CHECK_URL, { signal: AbortSignal.timeout(UPDATE_CHECK_TIMEOUT_MS) });
+    if (!response.ok) {
+      return null;
+    }
+    const pkg = await response.json();
+    return typeof pkg.version === "string" ? pkg.version : null;
+  } catch {
+    return null;
+  }
+}
+async function checkForUpdate(deps = {}) {
+  const now = deps.now ?? /* @__PURE__ */ new Date();
+  const file = deps.cachePath ?? UPDATE_CHECK_CACHE_PATH;
+  const cache = readCache(file);
+  const fresh = cache !== null && now.getTime() - Date.parse(cache.checkedAt) < UPDATE_CHECK_TTL_MS;
+  let latest;
+  if (fresh && cache) {
+    latest = cache.latestVersion;
+  } else {
+    latest = await fetchLatest(deps.fetchFn ?? fetch);
+    if (latest !== null) {
+      writeCache(file, { checkedAt: now.toISOString(), latestVersion: latest });
+    } else if (cache) {
+      latest = cache.latestVersion;
+    }
+  }
+  return { currentVersion: APP_VERSION, latestVersion: latest, updateAvailable: latest !== null && isNewer(latest, APP_VERSION) };
 }
 
 // src/cli/runtime.ts
 var import_dotenv = __toESM(require_main(), 1);
-var import_node_fs = __toESM(require("node:fs"), 1);
+var import_node_fs3 = __toESM(require("node:fs"), 1);
 
-// src/api/errors.ts
-var AppError = class extends Error {
-  code;
-  userMessage;
-  details;
-  constructor(params) {
-    super(`${params.code}: ${params.userMessage}`, { cause: params.cause });
-    this.name = "AppError";
-    this.code = params.code;
-    this.userMessage = params.userMessage;
-    this.details = params.details;
+// src/api/client.ts
+var import_node_crypto = __toESM(require("node:crypto"), 1);
+var import_node_fs2 = __toESM(require("node:fs"), 1);
+var import_node_path3 = __toESM(require("node:path"), 1);
+
+// src/api/allowlist.ts
+var ALLOWED_V1 = /* @__PURE__ */ new Set([
+  "scope",
+  "user.current",
+  "user.get",
+  "user.search",
+  "im.recent.list",
+  "im.counters.get",
+  "im.search.chat.list",
+  "im.dialog.get",
+  "im.dialog.users.list",
+  "im.dialog.messages.get",
+  "im.dialog.messages.search",
+  "im.notify.get",
+  "im.department.get",
+  "im.department.managers.get",
+  "im.department.employees.get",
+  "im.department.colleagues.list",
+  "im.search.department.list",
+  "socialnetwork.api.workgroup.list",
+  "socialnetwork.api.workgroup.get",
+  "sonet_group.user.groups",
+  "sonet_group.user.get",
+  "tasks.task.list",
+  "tasks.task.get",
+  "task.checklistitem.getlist",
+  "disk.storage.getlist",
+  "disk.storage.getchildren",
+  "disk.folder.getchildren",
+  "disk.file.get",
+  "disk.file.search",
+  "calendar.event.get",
+  "calendar.event.getbyid",
+  "log.blogpost.get",
+  "log.blogcomment.get",
+  "timeman.status"
+]);
+var ALLOWED_V3 = /* @__PURE__ */ new Set([
+  "mail.mailbox.list",
+  "mail.message.list",
+  "mail.message.get",
+  "mail.message.thread",
+  "call.followup.list",
+  "call.followup.get",
+  "note.collection.list",
+  "note.document.search.list",
+  "note.document.tree.list",
+  "note.document.get",
+  "timeman.record.list"
+]);
+var FORBIDDEN_WORDS = /* @__PURE__ */ new Set([
+  "add",
+  "update",
+  "delete",
+  "set",
+  "send",
+  "read",
+  "unread",
+  "mark",
+  "move",
+  "copy",
+  "rename",
+  "upload",
+  "commit",
+  "share",
+  "external",
+  "hide",
+  "pin",
+  "mute",
+  "leave",
+  "like",
+  "answer",
+  "confirm",
+  "create",
+  "start",
+  "complete",
+  "approve",
+  "delegate",
+  "restore",
+  "forward",
+  "reply",
+  "open",
+  "close",
+  "pause",
+  "remove",
+  "defer",
+  "renew",
+  "stop",
+  "attach",
+  "archive",
+  "invite",
+  "join",
+  "bind",
+  "register",
+  "save",
+  "command",
+  "writing",
+  "terminate",
+  "favorite"
+]);
+var READ_LAST_WORDS = /* @__PURE__ */ new Set([
+  "get",
+  "list",
+  "search",
+  "getlist",
+  "getchildren",
+  "getbyid",
+  "thread",
+  "current",
+  "status",
+  "groups",
+  "scope"
+]);
+function splitMethodWords(method) {
+  return method.split(/[._]/).flatMap((part) => part.split(/(?<=[a-z0-9])(?=[A-Z])/)).map((word) => word.toLowerCase()).filter((word) => word !== "");
+}
+function isForbiddenWord(word) {
+  const stems = [word];
+  for (const prefix of ["get", "un", "dis"]) {
+    if (word.startsWith(prefix)) {
+      stems.push(word.slice(prefix.length));
+    }
+  }
+  return stems.some((stem) => [...FORBIDDEN_WORDS].some((verb) => stem.startsWith(verb)));
+}
+function isForbiddenName(method) {
+  return splitMethodWords(method).some(isForbiddenWord);
+}
+function isReadOnlyShape(method) {
+  const words = splitMethodWords(method);
+  const last = words[words.length - 1];
+  return last !== void 0 && READ_LAST_WORDS.has(last) && !isForbiddenName(method);
+}
+var SCOPE_BY_PREFIX = [
+  ["scope", "basic"],
+  ["user.", "user_basic"],
+  ["im.", "im"],
+  ["socialnetwork.", "sonet_group"],
+  ["sonet_group.", "sonet_group"],
+  ["tasks.", "task"],
+  ["task.", "task"],
+  ["disk.", "disk"],
+  ["calendar.", "calendar"],
+  ["log.", "log"],
+  ["timeman.", "timeman"],
+  ["mail.", "mail"],
+  ["call.", "call"],
+  ["note.", "note"]
+];
+var SCOPE_SECTIONS = {
+  basic: "\u043E\u0441\u043D\u043E\u0432\u0430",
+  user_basic: "\u0441\u043E\u0442\u0440\u0443\u0434\u043D\u0438\u043A\u0438",
+  im: "\u0447\u0430\u0442\u044B, \u0443\u0432\u0435\u0434\u043E\u043C\u043B\u0435\u043D\u0438\u044F \u0438 \u043E\u0440\u0433\u0441\u0442\u0440\u0443\u043A\u0442\u0443\u0440\u0430",
+  sonet_group: "\u043F\u0440\u043E\u0435\u043A\u0442\u044B",
+  task: "\u0437\u0430\u0434\u0430\u0447\u0438",
+  disk: "\u0434\u0438\u0441\u043A",
+  calendar: "\u043A\u0430\u043B\u0435\u043D\u0434\u0430\u0440\u044C",
+  log: "\u0436\u0438\u0432\u0430\u044F \u043B\u0435\u043D\u0442\u0430",
+  timeman: "\u0440\u0430\u0431\u043E\u0447\u0435\u0435 \u0432\u0440\u0435\u043C\u044F",
+  mail: "\u043F\u043E\u0447\u0442\u0430",
+  call: "\u0438\u0442\u043E\u0433\u0438 \u0432\u0441\u0442\u0440\u0435\u0447",
+  note: "\u0431\u0430\u0437\u0430 \u0437\u043D\u0430\u043D\u0438\u0439"
+};
+function scopeForMethod(method) {
+  const hit = SCOPE_BY_PREFIX.find(([prefix]) => prefix.endsWith(".") ? method.startsWith(prefix) : method === prefix);
+  return hit?.[1];
+}
+
+// src/api/bitrix-errors.ts
+var AUTH_CODES = /* @__PURE__ */ new Set(["INVALID_CREDENTIALS", "NO_AUTH_FOUND", "INVALID_TOKEN", "EXPIRED_TOKEN", "WRONG_AUTH_TYPE"]);
+var BAD_REQUEST_CODES = /* @__PURE__ */ new Set(["ERROR_ARGUMENT", "WRONG_ARGUMENTS", "INVALID_ARGUMENT", "INVALID_REQUEST"]);
+function resetTime(epochSeconds) {
+  if (epochSeconds === void 0 || !Number.isFinite(epochSeconds)) {
+    return "\u0447\u0435\u0440\u0435\u0437 \u043D\u0435\u0441\u043A\u043E\u043B\u044C\u043A\u043E \u043C\u0438\u043D\u0443\u0442";
+  }
+  const d = new Date(epochSeconds * 1e3);
+  return `\u043F\u043E\u0441\u043B\u0435 ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+}
+function isBadRequestCode(upper) {
+  return BAD_REQUEST_CODES.has(upper) || upper.startsWith("INVALID_") || upper.endsWith("_EMPTY") || upper.endsWith("_STRING") || upper.includes("VALIDATION") || upper.includes("INVALIDJSON") || upper.includes("UNKNOWNDTOPROPERTY") || upper.includes("UNKNOWNFILTEROPERATOR");
+}
+function mapBitrixError(input) {
+  const upper = input.code.trim().toUpperCase();
+  const description = input.description ?? "";
+  const details = { bitrixCode: input.code, status: input.status, method: input.method, description: input.description };
+  const make = (code, userMessage) => new AppError({ code, userMessage, details });
+  const accessDenied = () => make("APP_B24_ACCESS_DENIED", "\u041D\u0435\u0442 \u0434\u043E\u0441\u0442\u0443\u043F\u0430: \u0432\u044B \u043D\u0435 \u0443\u0447\u0430\u0441\u0442\u043D\u0438\u043A \u044D\u0442\u043E\u0433\u043E \u0447\u0430\u0442\u0430 \u0438\u043B\u0438 \u0443 \u0432\u0430\u0441 \u043D\u0435\u0442 \u043F\u0440\u0430\u0432 \u043D\u0430 \u044D\u0442\u043E\u0442 \u043E\u0431\u044A\u0435\u043A\u0442 \u0432 \u0411\u0438\u0442\u0440\u0438\u043A\u044124.");
+  const notFound = () => make("APP_B24_NOT_FOUND", "\u041D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u043E: \u0442\u0430\u043A\u043E\u0433\u043E \u043E\u0431\u044A\u0435\u043A\u0442\u0430 \u043D\u0435\u0442 \u0438\u043B\u0438 \u043E\u043D \u0443\u0434\u0430\u043B\u0451\u043D. \u041F\u0440\u043E\u0432\u0435\u0440\u044C\u0442\u0435 \u043D\u043E\u043C\u0435\u0440.");
+  const badRequest = () => {
+    const fields = input.fields && input.fields.length > 0 ? `: ${input.fields.join(", ")}` : "";
+    return make("APP_B24_BAD_REQUEST", `\u0411\u0438\u0442\u0440\u0438\u043A\u044124 \u043E\u0442\u043A\u043B\u043E\u043D\u0438\u043B \u043F\u0430\u0440\u0430\u043C\u0435\u0442\u0440\u044B \u0437\u0430\u043F\u0440\u043E\u0441\u0430${fields}. \u0418\u0441\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \u043F\u0430\u0440\u0430\u043C\u0435\u0442\u0440\u044B \u043A\u043E\u043C\u0430\u043D\u0434\u044B.`);
+  };
+  if (upper === "OVERLOAD_LIMIT") {
+    return make("APP_B24_BLOCKED", "\u0411\u0438\u0442\u0440\u0438\u043A\u044124 \u0437\u0430\u0431\u043B\u043E\u043A\u0438\u0440\u043E\u0432\u0430\u043B \u0437\u0430\u043F\u0440\u043E\u0441\u044B \u043A \u043F\u043E\u0440\u0442\u0430\u043B\u0443. \u041F\u043E\u0432\u0442\u043E\u0440\u044F\u0442\u044C \u0431\u0435\u0441\u043F\u043E\u043B\u0435\u0437\u043D\u043E \u2014 \u043E\u0431\u0440\u0430\u0442\u0438\u0442\u0435\u0441\u044C \u0432 \u043F\u043E\u0434\u0434\u0435\u0440\u0436\u043A\u0443 \u0411\u0438\u0442\u0440\u0438\u043A\u044124.");
+  }
+  if (upper === "QUERY_LIMIT_EXCEEDED") {
+    return make("APP_B24_RATE_LIMITED", "\u0411\u0438\u0442\u0440\u0438\u043A\u044124 \u0432\u0440\u0435\u043C\u0435\u043D\u043D\u043E \u043E\u0433\u0440\u0430\u043D\u0438\u0447\u0438\u043B \u0447\u0430\u0441\u0442\u043E\u0442\u0443 \u0437\u0430\u043F\u0440\u043E\u0441\u043E\u0432. \u041F\u043E\u0432\u0442\u043E\u0440\u0438\u0442\u0435 \u0447\u0435\u0440\u0435\u0437 \u043D\u0435\u0441\u043A\u043E\u043B\u044C\u043A\u043E \u0441\u0435\u043A\u0443\u043D\u0434.");
+  }
+  if (upper === "OPERATION_TIME_LIMIT") {
+    return make(
+      "APP_B24_METHOD_TIME_LIMIT",
+      `\u0411\u0438\u0442\u0440\u0438\u043A\u044124 \u0432\u0440\u0435\u043C\u0435\u043D\u043D\u043E \u043E\u0433\u0440\u0430\u043D\u0438\u0447\u0438\u043B \u044D\u0442\u043E\u0442 \u0440\u0430\u0437\u0434\u0435\u043B \u0438\u0437-\u0437\u0430 \u043E\u0431\u044A\u0451\u043C\u0430 \u0437\u0430\u043F\u0440\u043E\u0441\u043E\u0432. \u041F\u043E\u0432\u0442\u043E\u0440\u0438\u0442\u0435 ${resetTime(input.operatingResetAt)}.`
+    );
+  }
+  if (upper === "ACCESS_DENIED" && input.status === 401) {
+    return make(
+      "APP_B24_REST_UNAVAILABLE",
+      "\u041D\u0430 \u0442\u0430\u0440\u0438\u0444\u0435 \u043F\u043E\u0440\u0442\u0430\u043B\u0430 \u0411\u0438\u0442\u0440\u0438\u043A\u044124 \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u0435\u043D REST API \u2014 \u0441\u043A\u0438\u043B\u043B \u0440\u0430\u0431\u043E\u0442\u0430\u0442\u044C \u043D\u0435 \u043C\u043E\u0436\u0435\u0442. \u041D\u0443\u0436\u0435\u043D \u043A\u043E\u043C\u043C\u0435\u0440\u0447\u0435\u0441\u043A\u0438\u0439 \u0442\u0430\u0440\u0438\u0444."
+    );
+  }
+  if (upper === "INSUFFICIENT_SCOPE" || upper.includes("INSUFFICIENTSCOPE")) {
+    const scope = scopeForMethod(input.method) ?? "\u043D\u0443\u0436\u043D\u043E\u0435 \u043F\u0440\u0430\u0432\u043E";
+    const section = SCOPE_SECTIONS[scope] ?? input.method;
+    return make(
+      "APP_B24_SCOPE_MISSING",
+      `\u0423 \u0432\u0435\u0431\u0445\u0443\u043A\u0430 \u043D\u0435\u0442 \u043F\u0440\u0430\u0432\u0430 \xAB${scope}\xBB \u2014 \u0440\u0430\u0437\u0434\u0435\u043B \xAB${section}\xBB \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u0435\u043D. \u0414\u043E\u0431\u0430\u0432\u044C\u0442\u0435 \u043F\u0440\u0430\u0432\u043E \u0432 \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0430\u0445 \u0432\u0435\u0431\u0445\u0443\u043A\u0430.`
+    );
+  }
+  if (AUTH_CODES.has(upper) || input.status === 401) {
+    return make(
+      "APP_B24_AUTH_FAILED",
+      "\u041F\u043E\u0440\u0442\u0430\u043B \u043D\u0435 \u043F\u0440\u0438\u043D\u044F\u043B \u043A\u043B\u044E\u0447 \u0434\u043E\u0441\u0442\u0443\u043F\u0430: \u0432\u0435\u0431\u0445\u0443\u043A \u0443\u0434\u0430\u043B\u0451\u043D, \u0443 \u043D\u0435\u0433\u043E \u0438\u0441\u0442\u0451\u043A \u0441\u0440\u043E\u043A \u0438\u043B\u0438 \u0438\u0437\u043C\u0435\u043D\u0438\u043B\u0441\u044F \u043A\u043E\u0434. \u0421\u043E\u0437\u0434\u0430\u0439\u0442\u0435 \u043D\u043E\u0432\u044B\u0439 \u0432\u0435\u0431\u0445\u0443\u043A \u0438 \u0437\u0430\u043C\u0435\u043D\u0438\u0442\u0435 \u0430\u0434\u0440\u0435\u0441 \u0432 \u0444\u0430\u0439\u043B\u0435 \u043D\u0430\u0441\u0442\u0440\u043E\u0435\u043A."
+    );
+  }
+  if (upper === "ERROR_METHOD_NOT_FOUND") {
+    return make(
+      "APP_B24_METHOD_UNAVAILABLE",
+      "\u041C\u0435\u0442\u043E\u0434 \u0411\u0438\u0442\u0440\u0438\u043A\u044124 \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u0435\u043D: \u0443 \u0432\u0435\u0431\u0445\u0443\u043A\u0430 \u043D\u0435\u0442 \u043D\u0443\u0436\u043D\u043E\u0433\u043E \u043F\u0440\u0430\u0432\u0430 \u0438\u043B\u0438 \u043F\u043E\u0440\u0442\u0430\u043B \u043D\u0435 \u043F\u043E\u0434\u0434\u0435\u0440\u0436\u0438\u0432\u0430\u0435\u0442 \u044D\u0442\u043E\u0442 \u0440\u0430\u0437\u0434\u0435\u043B. \u041F\u0440\u043E\u0432\u0435\u0440\u044C\u0442\u0435 \u043F\u0440\u0430\u0432\u0430 \u0432\u0435\u0431\u0445\u0443\u043A\u0430 \u043A\u043E\u043C\u0430\u043D\u0434\u043E\u0439 status."
+    );
+  }
+  if (upper.includes("ACCESS_DENIED") || upper === "ACCESS_ERROR" || upper.includes("ACCESSDENIED")) {
+    return accessDenied();
+  }
+  if (upper.includes("NOT_FOUND") || upper.includes("NOTFOUND")) {
+    return notFound();
+  }
+  if (isBadRequestCode(upper)) {
+    return badRequest();
+  }
+  if (/not\s*found|не\s*найден/i.test(description)) {
+    return notFound();
+  }
+  if (/access\s*denied|нет\s*доступа|доступ\s*запрещ/i.test(description)) {
+    return accessDenied();
+  }
+  if (input.status === 403) {
+    return accessDenied();
+  }
+  if (input.status === 404) {
+    return notFound();
+  }
+  if (input.status === 400) {
+    return badRequest();
+  }
+  return make("APP_B24_PORTAL_ERROR", "\u0411\u0438\u0442\u0440\u0438\u043A\u044124 \u0432\u0435\u0440\u043D\u0443\u043B \u043E\u0448\u0438\u0431\u043A\u0443 \u043F\u0440\u0438 \u0432\u044B\u043F\u043E\u043B\u043D\u0435\u043D\u0438\u0438 \u0437\u0430\u043F\u0440\u043E\u0441\u0430. \u041F\u043E\u0432\u0442\u043E\u0440\u0438\u0442\u0435 \u043F\u043E\u0437\u0436\u0435.");
+}
+
+// src/api/client.ts
+function isDownloadPath(pathname, webhook) {
+  return pathname === "/rest/download.json" || pathname === `/rest/${webhook.userId}/${webhook.code}/download/`;
+}
+function isObject(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+function operatingResetAt(body) {
+  const time = body.time;
+  return isObject(time) && typeof time.operating_reset_at === "number" ? time.operating_reset_at : void 0;
+}
+function unexpected(method, status2) {
+  return new AppError({
+    code: "APP_B24_UNEXPECTED_RESPONSE",
+    userMessage: "\u0411\u0438\u0442\u0440\u0438\u043A\u044124 \u0432\u0435\u0440\u043D\u0443\u043B \u0434\u0430\u043D\u043D\u044B\u0435 \u0432 \u043D\u0435\u043E\u0436\u0438\u0434\u0430\u043D\u043D\u043E\u043C \u0432\u0438\u0434\u0435 \u2014 \u043A\u043E\u043C\u0430\u043D\u0434\u0430 \u043D\u0435 \u043C\u043E\u0436\u0435\u0442 \u0438\u0445 \u0440\u0430\u0437\u043E\u0431\u0440\u0430\u0442\u044C.",
+    details: { method, status: status2 }
+  });
+}
+function portalError(method, status2) {
+  return new AppError({
+    code: "APP_B24_PORTAL_ERROR",
+    userMessage: "\u0411\u0438\u0442\u0440\u0438\u043A\u044124 \u0432\u0435\u0440\u043D\u0443\u043B \u043E\u0448\u0438\u0431\u043A\u0443 \u043F\u0440\u0438 \u0432\u044B\u043F\u043E\u043B\u043D\u0435\u043D\u0438\u0438 \u0437\u0430\u043F\u0440\u043E\u0441\u0430. \u041F\u043E\u0432\u0442\u043E\u0440\u0438\u0442\u0435 \u043F\u043E\u0437\u0436\u0435.",
+    details: { method, status: status2 }
+  });
+}
+function transportError(err, method) {
+  const name = err instanceof Error || err instanceof DOMException ? err.name : "";
+  if (name === "TimeoutError" || name === "AbortError") {
+    return new AppError({
+      code: "APP_B24_TIMEOUT",
+      userMessage: "\u0411\u0438\u0442\u0440\u0438\u043A\u044124 \u043D\u0435 \u043E\u0442\u0432\u0435\u0442\u0438\u043B \u0432\u043E\u0432\u0440\u0435\u043C\u044F. \u041F\u043E\u0432\u0442\u043E\u0440\u0438\u0442\u0435 \u0437\u0430\u043F\u0440\u043E\u0441 \u0438\u043B\u0438 \u0443\u043C\u0435\u043D\u044C\u0448\u0438\u0442\u0435 \u043E\u0431\u044A\u0451\u043C (--limit).",
+      details: { method },
+      cause: err
+    });
+  }
+  return new AppError({
+    code: "APP_B24_NETWORK",
+    userMessage: "\u041D\u0435\u0442 \u0441\u0432\u044F\u0437\u0438 \u0441 \u043F\u043E\u0440\u0442\u0430\u043B\u043E\u043C \u0411\u0438\u0442\u0440\u0438\u043A\u044124. \u041F\u0440\u043E\u0432\u0435\u0440\u044C\u0442\u0435 \u0438\u043D\u0442\u0435\u0440\u043D\u0435\u0442 \u0438 \u0430\u0434\u0440\u0435\u0441 \u043F\u043E\u0440\u0442\u0430\u043B\u0430.",
+    details: { method },
+    cause: err
+  });
+}
+function notAllowed(method) {
+  return new AppError({
+    code: "APP_B24_METHOD_NOT_ALLOWED",
+    userMessage: "\u041A\u043E\u043C\u0430\u043D\u0434\u0430 \u043F\u043E\u043F\u044B\u0442\u0430\u043B\u0430\u0441\u044C \u0432\u044B\u0437\u0432\u0430\u0442\u044C \u043C\u0435\u0442\u043E\u0434, \u043A\u043E\u0442\u043E\u0440\u044B\u0439 \u044D\u0442\u043E\u0442 \u0441\u043A\u0438\u043B\u043B \u043D\u0435 \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u0435\u0442; \u0437\u0430\u043F\u0440\u043E\u0441 \u043D\u0435 \u043E\u0442\u043F\u0440\u0430\u0432\u043B\u0435\u043D.",
+    details: { method }
+  });
+}
+async function placeWithoutOverwrite(tmpPath, destPath, fail) {
+  try {
+    await import_node_fs2.default.promises.link(tmpPath, destPath);
+    return;
+  } catch (err) {
+    const code = err.code;
+    if (code === "EEXIST") {
+      throw fail("dest-exists", err);
+    }
+    if (code !== "EPERM" && code !== "ENOTSUP" && code !== "EXDEV" && code !== "EOPNOTSUPP") {
+      throw fail("io", err);
+    }
+  }
+  try {
+    await import_node_fs2.default.promises.copyFile(tmpPath, destPath, import_node_fs2.default.constants.COPYFILE_EXCL);
+  } catch (err) {
+    throw fail(err.code === "EEXIST" ? "dest-exists" : "io", err);
+  }
+}
+var B24Client = class {
+  webhook;
+  fetchFn;
+  now;
+  sleep;
+  timeoutMs;
+  idleTimeoutMs;
+  minIntervalMs;
+  lastRequestAt = null;
+  // Время сброса лимита по времени метода из последнего успешного ответа:
+  // документация советует ориентироваться на него (error-codes.md).
+  lastOperatingResetAt;
+  constructor(options) {
+    this.webhook = options.webhook;
+    this.fetchFn = options.fetchFn ?? fetch;
+    this.now = options.now ?? (() => performance.now());
+    this.sleep = options.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
+    this.timeoutMs = options.timeoutMs ?? REQUEST_TIMEOUT_MS;
+    this.idleTimeoutMs = options.idleTimeoutMs ?? DOWNLOAD_IDLE_TIMEOUT_MS;
+    this.minIntervalMs = options.minIntervalMs ?? MIN_REQUEST_INTERVAL_MS;
+  }
+  async call(method, params = {}) {
+    if (!ALLOWED_V1.has(method) || !isReadOnlyShape(method)) {
+      throw notAllowed(method);
+    }
+    const { origin, userId, code } = this.webhook;
+    const { status: status2, body } = await this.post(`${origin}/rest/${userId}/${code}/${method}.json`, params, method);
+    if ("error" in body && !isObject(body.error)) {
+      throw mapBitrixError({
+        code: String(body.error ?? ""),
+        status: status2,
+        method,
+        description: typeof body.error_description === "string" ? body.error_description : void 0,
+        operatingResetAt: operatingResetAt(body) ?? this.lastOperatingResetAt
+      });
+    }
+    if (status2 >= 400 || !("result" in body)) {
+      throw status2 >= 500 ? portalError(method, status2) : unexpected(method, status2);
+    }
+    const response = { result: body.result };
+    if (typeof body.next === "number") {
+      response.next = body.next;
+    }
+    if (typeof body.total === "number") {
+      response.total = body.total;
+    }
+    return response;
+  }
+  async callV3(method, payload = {}) {
+    if (!ALLOWED_V3.has(method) || !isReadOnlyShape(method)) {
+      throw notAllowed(method);
+    }
+    const { origin, userId, code } = this.webhook;
+    const { status: status2, body } = await this.post(`${origin}/rest/api/${userId}/${code}/${method}`, payload, method);
+    if ("error" in body) {
+      const error = isObject(body.error) ? body.error : { code: body.error, message: body.error_description };
+      const validation = Array.isArray(error.validation) ? error.validation : [];
+      const fields = validation.map((item) => isObject(item) && typeof item.field === "string" ? item.field : void 0).filter((field) => field !== void 0);
+      throw mapBitrixError({
+        code: String(error.code ?? ""),
+        status: status2,
+        method,
+        description: typeof error.message === "string" ? error.message : void 0,
+        fields,
+        operatingResetAt: operatingResetAt(body) ?? this.lastOperatingResetAt
+      });
+    }
+    if (status2 >= 400 || !("result" in body)) {
+      throw status2 >= 500 ? portalError(method, status2) : unexpected(method, status2);
+    }
+    return body.result;
+  }
+  async download(url, destPath, expectedSize, maxBytes) {
+    const name = import_node_path3.default.basename(destPath);
+    const fail = (reason, cause) => new AppError({
+      code: "APP_B24_DOWNLOAD_FAILED",
+      userMessage: `\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u0441\u043A\u0430\u0447\u0430\u0442\u044C \u0444\u0430\u0439\u043B \xAB${name}\xBB. \u041F\u043E\u0432\u0442\u043E\u0440\u0438\u0442\u0435 \u043F\u043E\u0437\u0436\u0435.`,
+      details: { reason },
+      cause
+    });
+    let parsed;
+    try {
+      parsed = new URL(url);
+    } catch {
+      throw fail("bad-url");
+    }
+    if (parsed.origin !== this.webhook.origin) {
+      throw fail("foreign-host");
+    }
+    if (!isDownloadPath(parsed.pathname, this.webhook)) {
+      throw fail("not-a-download-link");
+    }
+    await this.pace();
+    const tmpPath = `${destPath}.part-${process.pid}-${import_node_crypto.default.randomBytes(4).toString("hex")}`;
+    const controller = new AbortController();
+    const responseTimer = setTimeout(
+      () => controller.abort(new DOMException("response timeout", "TimeoutError")),
+      this.timeoutMs
+    );
+    let handle;
+    try {
+      let response;
+      try {
+        response = await this.fetchFn(url, {
+          method: "GET",
+          redirect: "follow",
+          headers: {
+            "User-Agent": USER_AGENT,
+            Accept: "*/*",
+            "Accept-Language": "ru-RU,ru;q=0.9",
+            Referer: `${this.webhook.origin}/`
+          },
+          signal: controller.signal
+        });
+      } catch (err) {
+        throw fail("transport", err);
+      } finally {
+        clearTimeout(responseTimer);
+      }
+      const finalUrl = response.url === "" ? url : response.url;
+      if (new URL(finalUrl).origin !== this.webhook.origin) {
+        void response.body?.cancel().catch(() => void 0);
+        throw fail("redirect-foreign-host");
+      }
+      if (response.status !== 200 || !response.body) {
+        void response.body?.cancel().catch(() => void 0);
+        throw fail(`status-${response.status}`);
+      }
+      const contentType = response.headers.get("content-type") ?? "";
+      if (/text\/html/i.test(contentType) && !/\.html?$/i.test(name)) {
+        void response.body.cancel().catch(() => void 0);
+        throw fail("html-instead-of-file");
+      }
+      handle = await import_node_fs2.default.promises.open(tmpPath, "wx");
+      const reader = response.body.getReader();
+      let bytes = 0;
+      for (; ; ) {
+        const chunk = await this.readWithIdleTimeout(reader, controller, fail);
+        if (chunk.done) {
+          break;
+        }
+        bytes += chunk.value.byteLength;
+        if (bytes > maxBytes || bytes > expectedSize) {
+          void reader.cancel().catch(() => void 0);
+          throw fail(bytes > maxBytes ? "over-limit" : "more-than-expected");
+        }
+        await handle.write(chunk.value);
+      }
+      await handle.close();
+      handle = void 0;
+      const written = (await import_node_fs2.default.promises.stat(tmpPath)).size;
+      if (bytes !== expectedSize || written !== expectedSize) {
+        throw fail(`size-mismatch-${written}-of-${expectedSize}`);
+      }
+      await placeWithoutOverwrite(tmpPath, destPath, fail);
+      await import_node_fs2.default.promises.rm(tmpPath, { force: true });
+      return { path: destPath, size: written };
+    } catch (err) {
+      await handle?.close().catch(() => void 0);
+      await import_node_fs2.default.promises.rm(tmpPath, { force: true }).catch(() => void 0);
+      throw err instanceof AppError ? err : fail("io", err);
+    }
+  }
+  readWithIdleTimeout(reader, controller, fail) {
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        controller.abort(new DOMException("idle timeout", "TimeoutError"));
+        void reader.cancel().catch(() => void 0);
+        reject(fail("idle-timeout"));
+      }, this.idleTimeoutMs);
+      reader.read().then(
+        (result) => {
+          clearTimeout(timer);
+          resolve(result);
+        },
+        (err) => {
+          clearTimeout(timer);
+          reject(err);
+        }
+      );
+    });
+  }
+  async post(url, payload, method) {
+    await this.pace();
+    let response;
+    let text;
+    try {
+      response = await this.fetchFn(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Accept: "application/json", "User-Agent": USER_AGENT },
+        body: JSON.stringify(payload),
+        redirect: "manual",
+        signal: AbortSignal.timeout(this.timeoutMs)
+      });
+      text = await response.text();
+    } catch (err) {
+      throw transportError(err, method);
+    }
+    if (response.status >= 300 && response.status < 400) {
+      throw new AppError({
+        code: "APP_B24_PORTAL_MOVED",
+        userMessage: "\u041F\u043E\u0440\u0442\u0430\u043B \u0411\u0438\u0442\u0440\u0438\u043A\u044124 \u043F\u0435\u0440\u0435\u0430\u0434\u0440\u0435\u0441\u0443\u0435\u0442 \u0437\u0430\u043F\u0440\u043E\u0441\u044B \u043D\u0430 \u0434\u0440\u0443\u0433\u043E\u0439 \u0430\u0434\u0440\u0435\u0441 \u2014 \u0432\u043E\u0437\u043C\u043E\u0436\u043D\u043E, \u043F\u043E\u0440\u0442\u0430\u043B \u043F\u0435\u0440\u0435\u0438\u043C\u0435\u043D\u043E\u0432\u0430\u043D. \u0421\u043E\u0437\u0434\u0430\u0439\u0442\u0435 \u0432\u0435\u0431\u0445\u0443\u043A \u0437\u0430\u043D\u043E\u0432\u043E \u0438 \u0437\u0430\u043C\u0435\u043D\u0438\u0442\u0435 \u0430\u0434\u0440\u0435\u0441 \u0432 \u0444\u0430\u0439\u043B\u0435 \u043D\u0430\u0441\u0442\u0440\u043E\u0435\u043A.",
+        details: { method, status: response.status }
+      });
+    }
+    let body;
+    try {
+      body = JSON.parse(text);
+    } catch {
+      throw response.status >= 500 ? portalError(method, response.status) : unexpected(method, response.status);
+    }
+    if (!isObject(body)) {
+      throw unexpected(method, response.status);
+    }
+    const resetAt = operatingResetAt(body);
+    if (resetAt !== void 0 && !("error" in body)) {
+      this.lastOperatingResetAt = resetAt;
+    }
+    return { status: response.status, body };
+  }
+  // Слот резервируется синхронно, до ожидания: при параллельных вызовах каждый
+  // следующий встаёт через интервал после предыдущего, а не все сразу.
+  async pace() {
+    const now = this.now();
+    const start = this.lastRequestAt === null ? now : Math.max(now, this.lastRequestAt + this.minIntervalMs);
+    this.lastRequestAt = start;
+    if (start > now) {
+      await this.sleep(start - now);
+    }
   }
 };
 
@@ -3886,11 +4514,52 @@ function parseWebhook(raw) {
   return { origin: url.origin, userId, code };
 }
 
+// src/render/dates.ts
+function machineTimeZone() {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone;
+}
+
+// src/render/output.ts
+var REDACTED_NOTE = "\u0412 \u0442\u0435\u043A\u0441\u0442\u0435 \u0441\u043A\u0440\u044B\u0442\u044B \u0437\u043D\u0430\u0447\u0435\u043D\u0438\u044F, \u043F\u043E\u0445\u043E\u0436\u0438\u0435 \u043D\u0430 \u043A\u043B\u044E\u0447\u0438 \u0434\u043E\u0441\u0442\u0443\u043F\u0430 (token=, auth= \u0438 \u0442. \u043F.).";
+function redactLeaves(value, onChange) {
+  if (typeof value === "string") {
+    const cleaned = redact(value, []);
+    if (cleaned !== value) {
+      onChange();
+    }
+    return cleaned;
+  }
+  if (Array.isArray(value)) {
+    return value.map((item) => redactLeaves(item, onChange));
+  }
+  if (typeof value === "object" && value !== null) {
+    return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, redactLeaves(item, onChange)]));
+  }
+  return value;
+}
+function finalizeOutput(envelope2, secrets) {
+  const raw = JSON.stringify(envelope2);
+  if (secrets.some((secret) => secret.trim() !== "" && raw.includes(secret.trim()))) {
+    throw new AppError({
+      code: "APP_B24_SECRET_IN_OUTPUT",
+      userMessage: "\u041E\u0442\u0432\u0435\u0442 \u043D\u0435 \u043F\u043E\u043A\u0430\u0437\u0430\u043D: \u0432 \u043D\u0451\u043C \u043E\u043A\u0430\u0437\u0430\u043B\u0441\u044F \u0430\u0434\u0440\u0435\u0441 \u0432\u0430\u0448\u0435\u0433\u043E \u0432\u0435\u0431\u0445\u0443\u043A\u0430 (\u043D\u0430\u043F\u0440\u0438\u043C\u0435\u0440, \u0435\u0433\u043E \u0432\u0441\u0442\u0430\u0432\u0438\u043B\u0438 \u0432 \u0447\u0430\u0442 \u0438\u043B\u0438 \u043F\u0438\u0441\u044C\u043C\u043E). \u0423\u0434\u0430\u043B\u0438\u0442\u0435 \u044D\u0442\u043E\u0442 \u0432\u0435\u0431\u0445\u0443\u043A \u0432 \u0411\u0438\u0442\u0440\u0438\u043A\u044124 \u0438 \u0441\u043E\u0437\u0434\u0430\u0439\u0442\u0435 \u043D\u043E\u0432\u044B\u0439."
+    });
+  }
+  let changed = false;
+  const cleaned = redactLeaves(envelope2, () => {
+    changed = true;
+  });
+  if (changed) {
+    cleaned.notes = [...cleaned.notes, REDACTED_NOTE];
+  }
+  return JSON.stringify(cleaned, null, 2);
+}
+
 // src/cli/runtime.ts
 function bootstrapEnv(envPath = ENV_PATH, env = process.env) {
   let content;
   try {
-    content = import_node_fs.default.readFileSync(envPath, "utf8");
+    content = import_node_fs3.default.readFileSync(envPath, "utf8");
   } catch (err) {
     if (err.code === "ENOENT") {
       return;
@@ -3905,6 +4574,9 @@ function bootstrapEnv(envPath = ENV_PATH, env = process.env) {
   if (value !== void 0 && !env[WEBHOOK_ENV]) {
     env[WEBHOOK_ENV] = value;
   }
+}
+function loadWebhook(env = process.env) {
+  return parseWebhook(env[WEBHOOK_ENV]);
 }
 function secretsFromEnv(env = process.env) {
   const raw = env[WEBHOOK_ENV]?.trim();
@@ -3953,6 +4625,198 @@ function reportError(err, secrets = secretsFromEnv()) {
   }
   process.exitCode = 1;
 }
+var DECIMAL_INT_RE = /^\d+$/;
+function parsePositiveInt(raw, optionName, max) {
+  const trimmed = raw.trim();
+  const value = Number(trimmed);
+  const withinMax = max === void 0 || value <= max;
+  if (!DECIMAL_INT_RE.test(trimmed) || !Number.isSafeInteger(value) || value <= 0 || !withinMax) {
+    const range = max === void 0 ? "\u043F\u043E\u043B\u043E\u0436\u0438\u0442\u0435\u043B\u044C\u043D\u044B\u043C \u0446\u0435\u043B\u044B\u043C \u0447\u0438\u0441\u043B\u043E\u043C" : `\u0446\u0435\u043B\u044B\u043C \u0447\u0438\u0441\u043B\u043E\u043C \u043E\u0442 1 \u0434\u043E ${max}`;
+    throw new AppError({
+      code: "APP_CLI_INVALID_ARGUMENT",
+      userMessage: `\u041F\u0430\u0440\u0430\u043C\u0435\u0442\u0440 ${optionName}: \u0434\u043E\u043B\u0436\u0435\u043D \u0431\u044B\u0442\u044C ${range}, \u043F\u043E\u043B\u0443\u0447\u0435\u043D\u043E \xAB${raw}\xBB.`
+    });
+  }
+  return value;
+}
+var runCommand = async (fn) => {
+  const webhook = loadWebhook();
+  const client = new B24Client({ webhook });
+  const result = await fn({ client, webhook, tz: machineTimeZone() });
+  process.stdout.write(`${finalizeOutput(result, secretsFromEnv())}
+`);
+};
+
+// src/commands/common.ts
+function envelope(data, next = null, notes = []) {
+  return { data, next, notes };
+}
+function isObject2(value) {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+function asArray(value) {
+  if (Array.isArray(value)) {
+    return value;
+  }
+  return isObject2(value) ? Object.values(value) : [];
+}
+function str(value) {
+  return typeof value === "string" ? value : value === null || value === void 0 ? "" : String(value);
+}
+function num(value) {
+  const n = typeof value === "number" ? value : typeof value === "string" && value.trim() !== "" ? Number(value) : NaN;
+  return Number.isFinite(n) ? n : null;
+}
+function parseLimit(raw, def, max, option = "--limit") {
+  return raw === void 0 ? def : parsePositiveInt(raw, option, max);
+}
+function personName(raw) {
+  const full = str(raw.name ?? raw.NAME_FORMATTED ?? raw.FULL_NAME).trim();
+  if (full !== "" && raw.NAME === void 0) {
+    return full;
+  }
+  const first = str(raw.NAME ?? raw.first_name ?? raw.firstName).trim();
+  const last = str(raw.LAST_NAME ?? raw.last_name ?? raw.lastName).trim();
+  const joined = `${first} ${last}`.trim();
+  return joined !== "" ? joined : full;
+}
+
+// src/commands/status.ts
+var SECTION_SCOPES = {
+  chats: "im",
+  notifications: "im",
+  org: "im",
+  tasks: "task",
+  projects: "sonet_group",
+  disk: "disk",
+  mail: "mail",
+  calendar: "calendar",
+  meetings: "call",
+  feed: "log",
+  kb: "note",
+  worktime: "timeman",
+  users: "user_basic"
+};
+var USER_SCOPES = ["user", "user_basic", "user_brief"];
+async function status(ctx, check = () => checkForUpdate()) {
+  const scopeResp = await ctx.client.call("scope");
+  const granted = (Array.isArray(scopeResp.result) ? scopeResp.result : []).map(String).sort();
+  const me = await ctx.client.call("user.current");
+  const version = await check();
+  const sections = {};
+  for (const [section, scope] of Object.entries(SECTION_SCOPES)) {
+    const ok = scope === "user_basic" ? USER_SCOPES.some((s) => granted.includes(s)) : granted.includes(scope);
+    sections[section] = ok ? "ok" : `\u043D\u0435\u0442 \u043F\u0440\u0430\u0432\u0430 ${scope}`;
+  }
+  const needed = /* @__PURE__ */ new Set([...Object.values(SECTION_SCOPES), ...USER_SCOPES, "basic"]);
+  const extra = granted.filter((s) => !needed.has(s));
+  const notes = [];
+  const missing = Object.entries(sections).filter(([, v]) => v !== "ok");
+  if (missing.length > 0) {
+    notes.push(`\u041D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u043D\u044B \u0440\u0430\u0437\u0434\u0435\u043B\u044B: ${missing.map(([k, v]) => `${k} (${v})`).join(", ")}. \u0414\u043E\u0431\u0430\u0432\u044C\u0442\u0435 \u043F\u0440\u0430\u0432\u0430 \u0432 \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0430\u0445 \u0432\u0435\u0431\u0445\u0443\u043A\u0430.`);
+  }
+  if (extra.length > 0) {
+    notes.push(`\u041B\u0438\u0448\u043D\u0438\u0435 \u043F\u0440\u0430\u0432\u0430 \u0443 \u0432\u0435\u0431\u0445\u0443\u043A\u0430: ${extra.join(", ")} \u2014 \u0441\u043A\u0438\u043B\u043B\u0443 \u043E\u043D\u0438 \u043D\u0435 \u043D\u0443\u0436\u043D\u044B, \u0438\u0445 \u043C\u043E\u0436\u043D\u043E \u0441\u043D\u044F\u0442\u044C \u0432 \u043D\u0430\u0441\u0442\u0440\u043E\u0439\u043A\u0430\u0445 \u0432\u0435\u0431\u0445\u0443\u043A\u0430.`);
+  }
+  if (version.updateAvailable) {
+    notes.push(`\u0412\u044B\u0448\u043B\u0430 \u043D\u043E\u0432\u0430\u044F \u0432\u0435\u0440\u0441\u0438\u044F \u0441\u043A\u0438\u043B\u043B\u0430 ${version.latestVersion} (\u0441\u0435\u0439\u0447\u0430\u0441 ${version.currentVersion}). \u041E\u0431\u043D\u043E\u0432\u0438\u0442\u044C: \u043F\u043E\u0432\u0442\u043E\u0440\u0438\u0442\u044C \u0443\u0441\u0442\u0430\u043D\u043E\u0432\u043A\u0443.`);
+  }
+  return envelope(
+    {
+      portal: new URL(ctx.webhook.origin).host,
+      webhookUserId: ctx.webhook.userId,
+      user: { id: num(me.result.ID) ?? ctx.webhook.userId, name: personName(me.result) },
+      sections,
+      scopes: { granted, extra },
+      version
+    },
+    null,
+    notes
+  );
+}
+
+// src/commands/users.ts
+var MAX_IDS = 50;
+function toUser(raw) {
+  return {
+    id: num(raw.ID) ?? 0,
+    name: personName(raw),
+    position: str(raw.WORK_POSITION),
+    departmentIds: asArray(raw.UF_DEPARTMENT).map((d) => num(d)).filter((d) => d !== null),
+    active: raw.ACTIVE === true || raw.ACTIVE === "Y"
+  };
+}
+async function usersFind(ctx, text, limitRaw) {
+  const limit = parseLimit(limitRaw, 10, 50);
+  const query = text.trim();
+  if (query.length < 2) {
+    throw new AppError({ code: "APP_CLI_INVALID_ARGUMENT", userMessage: "\u041F\u0430\u0440\u0430\u043C\u0435\u0442\u0440 \u0442\u0435\u043A\u0441\u0442: \u043D\u0443\u0436\u043D\u043E \u043D\u0435 \u043C\u0435\u043D\u044C\u0448\u0435 2 \u0441\u0438\u043C\u0432\u043E\u043B\u043E\u0432." });
+  }
+  const resp = await ctx.client.call("user.search", { FILTER: { FIND: query } });
+  const all = asArray(resp.result).filter(isObject2).map(toUser);
+  const notes = all.length > limit ? [`\u041F\u043E\u043A\u0430\u0437\u0430\u043D\u044B \u043F\u0435\u0440\u0432\u044B\u0435 ${limit} \u0438\u0437 ${resp.total ?? all.length}. \u0423\u0442\u043E\u0447\u043D\u0438\u0442\u0435 \u0437\u0430\u043F\u0440\u043E\u0441.`] : [];
+  return envelope(all.slice(0, limit), null, notes);
+}
+async function usersGet(ctx, idsRaw) {
+  const parts = idsRaw.split(",").map((p) => p.trim()).filter((p) => p !== "");
+  const ids = parts.map((p) => num(p));
+  if (parts.length === 0 || parts.length > MAX_IDS || ids.some((id) => id === null || !Number.isSafeInteger(id) || id <= 0)) {
+    throw new AppError({
+      code: "APP_CLI_INVALID_ARGUMENT",
+      userMessage: `\u041F\u0430\u0440\u0430\u043C\u0435\u0442\u0440 id: \u043E\u0436\u0438\u0434\u0430\u0435\u0442\u0441\u044F \u043E\u0442 1 \u0434\u043E ${MAX_IDS} \u043D\u043E\u043C\u0435\u0440\u043E\u0432 \u0441\u043E\u0442\u0440\u0443\u0434\u043D\u0438\u043A\u043E\u0432 \u0447\u0435\u0440\u0435\u0437 \u0437\u0430\u043F\u044F\u0442\u0443\u044E, \u043F\u043E\u043B\u0443\u0447\u0435\u043D\u043E \xAB${idsRaw}\xBB.`
+    });
+  }
+  const resp = await ctx.client.call("user.get", { filter: { ID: ids } });
+  return envelope(asArray(resp.result).filter(isObject2).map(toUser));
+}
+
+// src/cli/register-status-users.ts
+function registerStatusUsers(program2, run) {
+  program2.command("status").description("\u0412\u044B\u0437\u044B\u0432\u0430\u0442\u044C \u043F\u0435\u0440\u0432\u044B\u043C: \u043F\u043E\u0440\u0442\u0430\u043B, \u0447\u0435\u0439 \u0432\u0435\u0431\u0445\u0443\u043A, \u0434\u043E\u0441\u0442\u0443\u043F\u043D\u044B\u0435 \u0440\u0430\u0437\u0434\u0435\u043B\u044B, \u043B\u0438\u0448\u043D\u0438\u0435 \u043F\u0440\u0430\u0432\u0430, \u043D\u043E\u0432\u0430\u044F \u0432\u0435\u0440\u0441\u0438\u044F \u0441\u043A\u0438\u043B\u043B\u0430").action(() => run((ctx) => status(ctx)));
+  const users = program2.command("users").description("\u0421\u043E\u0442\u0440\u0443\u0434\u043D\u0438\u043A\u0438");
+  users.command("find").description("\u041D\u0430\u0439\u0442\u0438 \u0441\u043E\u0442\u0440\u0443\u0434\u043D\u0438\u043A\u0430 \u043F\u043E \u0438\u043C\u0435\u043D\u0438, \u0444\u0430\u043C\u0438\u043B\u0438\u0438 \u0438\u043B\u0438 \u0434\u043E\u043B\u0436\u043D\u043E\u0441\u0442\u0438").argument("<\u0442\u0435\u043A\u0441\u0442>", "\u043D\u0435 \u043C\u0435\u043D\u044C\u0448\u0435 2 \u0441\u0438\u043C\u0432\u043E\u043B\u043E\u0432").option("--limit <n>", "\u0441\u043A\u043E\u043B\u044C\u043A\u043E \u043F\u043E\u043A\u0430\u0437\u0430\u0442\u044C (\u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E 10, \u043C\u0430\u043A\u0441\u0438\u043C\u0443\u043C 50)").action((text, opts) => run((ctx) => usersFind(ctx, text, opts.limit)));
+  users.command("get").description("\u0418\u043C\u0435\u043D\u0430 \u0438 \u0434\u043E\u043B\u0436\u043D\u043E\u0441\u0442\u0438 \u043F\u043E \u043D\u043E\u043C\u0435\u0440\u0430\u043C \u0441\u043E\u0442\u0440\u0443\u0434\u043D\u0438\u043A\u043E\u0432").argument("<id>", "\u043D\u043E\u043C\u0435\u0440\u0430 \u0447\u0435\u0440\u0435\u0437 \u0437\u0430\u043F\u044F\u0442\u0443\u044E, \u0434\u043E 50").action((ids) => run((ctx) => usersGet(ctx, ids)));
+}
+
+// src/cli/program.ts
+function buildProgram(run = runCommand) {
+  const program2 = new Command();
+  program2.name(CLI_NAME).description(
+    "\u0411\u0438\u0442\u0440\u0438\u043A\u044124 \u0442\u043E\u043B\u044C\u043A\u043E \u043D\u0430 \u0447\u0442\u0435\u043D\u0438\u0435: \u0447\u0430\u0442\u044B, \u0437\u0430\u0434\u0430\u0447\u0438, \u043F\u0440\u043E\u0435\u043A\u0442\u044B, \u0434\u0438\u0441\u043A, \u043F\u043E\u0447\u0442\u0430, \u043A\u0430\u043B\u0435\u043D\u0434\u0430\u0440\u044C, \u0432\u0441\u0442\u0440\u0435\u0447\u0438, \u043B\u0435\u043D\u0442\u0430, \u0431\u0430\u0437\u0430 \u0437\u043D\u0430\u043D\u0438\u0439. \u0412\u044B\u0432\u043E\u0434 \u2014 JSON."
+  ).version(APP_VERSION).helpCommand(false).exitOverride().configureOutput({ writeErr: () => void 0, outputError: () => void 0 });
+  registerStatusUsers(program2, run);
+  return program2;
+}
+var HELP_CODES = /* @__PURE__ */ new Set(["commander.helpDisplayed", "commander.help", "commander.version"]);
+function translate(err) {
+  const token = /'([^']+)'/.exec(err.message)?.[1] ?? "";
+  const messages = {
+    "commander.unknownCommand": `\u041D\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043D\u0430\u044F \u043A\u043E\u043C\u0430\u043D\u0434\u0430 \xAB${token}\xBB. \u0421\u043F\u0438\u0441\u043E\u043A \u043A\u043E\u043C\u0430\u043D\u0434: b24 --help.`,
+    "commander.unknownOption": `\u041D\u0435\u0438\u0437\u0432\u0435\u0441\u0442\u043D\u044B\u0439 \u043F\u0430\u0440\u0430\u043C\u0435\u0442\u0440 \xAB${token}\xBB. \u0421\u043F\u0440\u0430\u0432\u043A\u0430 \u043F\u043E \u043A\u043E\u043C\u0430\u043D\u0434\u0435: b24 <\u043A\u043E\u043C\u0430\u043D\u0434\u0430> --help.`,
+    "commander.missingArgument": `\u041D\u0435 \u0445\u0432\u0430\u0442\u0430\u0435\u0442 \u0430\u0440\u0433\u0443\u043C\u0435\u043D\u0442\u0430 \xAB${token}\xBB. \u0421\u043F\u0440\u0430\u0432\u043A\u0430 \u043F\u043E \u043A\u043E\u043C\u0430\u043D\u0434\u0435: b24 <\u043A\u043E\u043C\u0430\u043D\u0434\u0430> --help.`,
+    "commander.optionMissingArgument": `\u0423 \u043F\u0430\u0440\u0430\u043C\u0435\u0442\u0440\u0430 \xAB${token}\xBB \u043D\u0435 \u0443\u043A\u0430\u0437\u0430\u043D\u043E \u0437\u043D\u0430\u0447\u0435\u043D\u0438\u0435.`,
+    "commander.missingMandatoryOptionValue": `\u041D\u0435 \u0443\u043A\u0430\u0437\u0430\u043D \u043E\u0431\u044F\u0437\u0430\u0442\u0435\u043B\u044C\u043D\u044B\u0439 \u043F\u0430\u0440\u0430\u043C\u0435\u0442\u0440 \xAB${token}\xBB.`,
+    "commander.excessArguments": "\u041B\u0438\u0448\u043D\u0438\u0435 \u0430\u0440\u0433\u0443\u043C\u0435\u043D\u0442\u044B \u0443 \u043A\u043E\u043C\u0430\u043D\u0434\u044B. \u0421\u043F\u0440\u0430\u0432\u043A\u0430 \u043F\u043E \u043A\u043E\u043C\u0430\u043D\u0434\u0435: b24 <\u043A\u043E\u043C\u0430\u043D\u0434\u0430> --help."
+  };
+  return new AppError({
+    code: "APP_CLI_INVALID_ARGUMENT",
+    userMessage: messages[err.code] ?? "\u041A\u043E\u043C\u0430\u043D\u0434\u0430 \u0432\u044B\u0437\u0432\u0430\u043D\u0430 \u043D\u0435\u0432\u0435\u0440\u043D\u043E: \u043F\u0440\u043E\u0432\u0435\u0440\u044C\u0442\u0435 \u043F\u0430\u0440\u0430\u043C\u0435\u0442\u0440\u044B. \u0421\u043F\u0440\u0430\u0432\u043A\u0430: b24 --help.",
+    details: { commanderCode: err.code }
+  });
+}
+async function parseArgs(argv, run = runCommand) {
+  try {
+    await buildProgram(run).parseAsync(argv, { from: "user" });
+  } catch (err) {
+    if (err instanceof CommanderError) {
+      if (HELP_CODES.has(err.code)) {
+        return;
+      }
+      throw translate(err);
+    }
+    throw err;
+  }
+}
 
 // src/cli.ts
 process.on("uncaughtException", (err) => {
@@ -3965,6 +4829,6 @@ process.on("unhandledRejection", (err) => {
 });
 async function main() {
   bootstrapEnv();
-  await buildProgram().parseAsync(process.argv);
+  await parseArgs(process.argv.slice(2));
 }
 main().catch((err) => reportError(err));

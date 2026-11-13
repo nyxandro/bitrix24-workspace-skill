@@ -3,7 +3,7 @@
  * Точка входа CLI «b24» — доступ ИИ-агента к Битрикс24 только на чтение.
  * Дерево команд — src/cli/program.ts, граница ошибок — src/cli/runtime.ts.
  */
-import { buildProgram } from './cli/program.js';
+import { parseArgs } from './cli/program.js';
 import { bootstrapEnv, reportError } from './cli/runtime.js';
 
 // Любая непойманная ошибка тоже проходит через вычистку секретов.
@@ -18,7 +18,7 @@ process.on('unhandledRejection', (err) => {
 
 async function main(): Promise<void> {
   bootstrapEnv();
-  await buildProgram().parseAsync(process.argv);
+  await parseArgs(process.argv.slice(2));
 }
 
 main().catch((err: unknown) => reportError(err));

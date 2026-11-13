@@ -29,3 +29,14 @@ export const REQUEST_TIMEOUT_MS = 60_000;
 // Скачивание: обрываем, только если данные перестали идти, а не по общему
 // времени — иначе большой файл на медленной сети не скачать никогда.
 export const DOWNLOAD_IDLE_TIMEOUT_MS = 60_000;
+
+// Проверка новой версии скилла: package.json ветки main публичного репозитория.
+// Никаких данных портала туда не уходит.
+export const UPDATE_CHECK_URL = 'https://raw.githubusercontent.com/nyxandro/bitrix24-workspace-skill/main/package.json';
+export const UPDATE_CHECK_TTL_MS = 24 * 60 * 60 * 1000;
+export const UPDATE_CHECK_TIMEOUT_MS = 2_500;
+export const UPDATE_CHECK_CACHE_PATH = path.join(CONFIG_DIR, 'update-check.json');
+
+// Размеры ответов: чтобы ответ влезал в контекст агента.
+export const MAX_TEXT_CHARS = 4_000;
+export const MAX_MEMBERS = 50;
