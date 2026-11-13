@@ -9,13 +9,17 @@ import type { CommandContext } from './common.js';
 
 export const TEST_WEBHOOK: Webhook = { origin: 'https://example.bitrix24.ru', userId: 1, code: 'testsecret0000' };
 
-type Handler = (body: Record<string, unknown>) => { status?: number; json: unknown };
+type Handler = (body: Record<string, unknown>) => { status?: number; json?: unknown; raw?: Uint8Array; headers?: Record<string, string> };
 
 export function fakeContext(handlers: Record<string, Handler | Handler[]>): { ctx: CommandContext; calls: { method: string; body: Record<string, unknown> }[] } {
   const calls: { method: string; body: Record<string, unknown> }[] = [];
   const queues = new Map(Object.entries(handlers).map(([k, v]) => [k, Array.isArray(v) ? [...v] : v]));
   const fetchFn = vi.fn(async (url: string, init: RequestInit) => {
-    const method = url.replace(/^.*\/rest\/(?:api\/)?\d+\/[^/]+\//, '').replace(/\.json$/, '');
+    const method = url
+      .replace(/^.*\/rest\/(?:api\/)?\d+\/[^/]+\//, '')
+      .replace(/\?.*$/, '')
+      .replace(/\/$/, '')
+      .replace(/\.json$/, '');
     const body = JSON.parse(String(init.body ?? '{}')) as Record<string, unknown>;
     calls.push({ method, body });
     const entry = queues.get(method);
@@ -23,7 +27,10 @@ export function fakeContext(handlers: Record<string, Handler | Handler[]>): { ct
     if (!handler) {
       throw new Error(`нет заглушки для ${method}`);
     }
-    const { status = 200, json } = handler(body);
+    const { status = 200, json, raw, headers } = handler(body);
+    if (raw !== undefined) {
+      return new Response(raw, { status, headers: headers ?? { 'Content-Type': 'application/octet-stream' } });
+    }
     return new Response(JSON.stringify(json), { status, headers: { 'Content-Type': 'application/json' } });
   });
   const client = new B24Client({ webhook: TEST_WEBHOOK, fetchFn: fetchFn as unknown as typeof fetch, now: () => 0, sleep: async () => undefined });

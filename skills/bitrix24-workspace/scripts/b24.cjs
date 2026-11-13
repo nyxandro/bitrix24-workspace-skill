@@ -1193,8 +1193,8 @@ var require_command = __commonJS({
   "node_modules/commander/lib/command.js"(exports2) {
     var EventEmitter = require("node:events").EventEmitter;
     var childProcess = require("node:child_process");
-    var path4 = require("node:path");
-    var fs4 = require("node:fs");
+    var path5 = require("node:path");
+    var fs5 = require("node:fs");
     var process2 = require("node:process");
     var { Argument: Argument2, humanReadableArgName } = require_argument();
     var { CommanderError: CommanderError2 } = require_error();
@@ -2188,7 +2188,7 @@ Expecting one of '${allowedValues.join("', '")}'`);
        * @param {string} subcommandName
        */
       _checkForMissingExecutable(executableFile, executableDir, subcommandName) {
-        if (fs4.existsSync(executableFile)) return;
+        if (fs5.existsSync(executableFile)) return;
         const executableDirMessage = executableDir ? `searched for local subcommand relative to directory '${executableDir}'` : "no directory for search for local subcommand, use .executableDir() to supply a custom directory";
         const executableMissing = `'${executableFile}' does not exist
  - if '${subcommandName}' is not meant to be an executable command, remove description parameter from '.command()' and use '.description()' instead
@@ -2206,11 +2206,11 @@ Expecting one of '${allowedValues.join("', '")}'`);
         let launchWithNode = false;
         const sourceExt = [".js", ".ts", ".tsx", ".mjs", ".cjs"];
         function findFile(baseDir, baseName) {
-          const localBin = path4.resolve(baseDir, baseName);
-          if (fs4.existsSync(localBin)) return localBin;
-          if (sourceExt.includes(path4.extname(baseName))) return void 0;
+          const localBin = path5.resolve(baseDir, baseName);
+          if (fs5.existsSync(localBin)) return localBin;
+          if (sourceExt.includes(path5.extname(baseName))) return void 0;
           const foundExt = sourceExt.find(
-            (ext) => fs4.existsSync(`${localBin}${ext}`)
+            (ext) => fs5.existsSync(`${localBin}${ext}`)
           );
           if (foundExt) return `${localBin}${foundExt}`;
           return void 0;
@@ -2222,21 +2222,21 @@ Expecting one of '${allowedValues.join("', '")}'`);
         if (this._scriptPath) {
           let resolvedScriptPath;
           try {
-            resolvedScriptPath = fs4.realpathSync(this._scriptPath);
+            resolvedScriptPath = fs5.realpathSync(this._scriptPath);
           } catch {
             resolvedScriptPath = this._scriptPath;
           }
-          executableDir = path4.resolve(
-            path4.dirname(resolvedScriptPath),
+          executableDir = path5.resolve(
+            path5.dirname(resolvedScriptPath),
             executableDir
           );
         }
         if (executableDir) {
           let localFile = findFile(executableDir, executableFile);
           if (!localFile && !subcommand._executableFile && this._scriptPath) {
-            const legacyName = path4.basename(
+            const legacyName = path5.basename(
               this._scriptPath,
-              path4.extname(this._scriptPath)
+              path5.extname(this._scriptPath)
             );
             if (legacyName !== this._name) {
               localFile = findFile(
@@ -2247,7 +2247,7 @@ Expecting one of '${allowedValues.join("', '")}'`);
           }
           executableFile = localFile || executableFile;
         }
-        launchWithNode = sourceExt.includes(path4.extname(executableFile));
+        launchWithNode = sourceExt.includes(path5.extname(executableFile));
         let proc;
         if (process2.platform !== "win32") {
           if (launchWithNode) {
@@ -3162,7 +3162,7 @@ Expecting one of '${allowedValues.join("', '")}'`);
        * @return {Command}
        */
       nameFromFilename(filename) {
-        this._name = path4.basename(filename, path4.extname(filename));
+        this._name = path5.basename(filename, path5.extname(filename));
         return this;
       }
       /**
@@ -3176,9 +3176,9 @@ Expecting one of '${allowedValues.join("', '")}'`);
        * @param {string} [path]
        * @return {(string|null|Command)}
        */
-      executableDir(path5) {
-        if (path5 === void 0) return this._executableDir;
-        this._executableDir = path5;
+      executableDir(path6) {
+        if (path6 === void 0) return this._executableDir;
+        this._executableDir = path6;
         return this;
       }
       /**
@@ -3459,8 +3459,8 @@ var require_commander = __commonJS({
 // node_modules/dotenv/lib/main.js
 var require_main = __commonJS({
   "node_modules/dotenv/lib/main.js"(exports2, module2) {
-    var fs4 = require("fs");
-    var path4 = require("path");
+    var fs5 = require("fs");
+    var path5 = require("path");
     var os2 = require("os");
     var crypto2 = require("crypto");
     var TIPS = [
@@ -3591,7 +3591,7 @@ var require_main = __commonJS({
       if (options && options.path && options.path.length > 0) {
         if (Array.isArray(options.path)) {
           for (const filepath of options.path) {
-            if (fs4.existsSync(filepath)) {
+            if (fs5.existsSync(filepath)) {
               possibleVaultPath = filepath.endsWith(".vault") ? filepath : `${filepath}.vault`;
             }
           }
@@ -3599,15 +3599,15 @@ var require_main = __commonJS({
           possibleVaultPath = options.path.endsWith(".vault") ? options.path : `${options.path}.vault`;
         }
       } else {
-        possibleVaultPath = path4.resolve(process.cwd(), ".env.vault");
+        possibleVaultPath = path5.resolve(process.cwd(), ".env.vault");
       }
-      if (fs4.existsSync(possibleVaultPath)) {
+      if (fs5.existsSync(possibleVaultPath)) {
         return possibleVaultPath;
       }
       return null;
     }
     function _resolveHome(envPath) {
-      return envPath[0] === "~" ? path4.join(os2.homedir(), envPath.slice(1)) : envPath;
+      return envPath[0] === "~" ? path5.join(os2.homedir(), envPath.slice(1)) : envPath;
     }
     function _configVault(options) {
       const debug = parseBoolean(process.env.DOTENV_CONFIG_DEBUG || options && options.debug);
@@ -3624,7 +3624,7 @@ var require_main = __commonJS({
       return { parsed };
     }
     function configDotenv(options) {
-      const dotenvPath = path4.resolve(process.cwd(), ".env");
+      const dotenvPath = path5.resolve(process.cwd(), ".env");
       let encoding = "utf8";
       let processEnv = process.env;
       if (options && options.processEnv != null) {
@@ -3652,13 +3652,13 @@ var require_main = __commonJS({
       }
       let lastError;
       const parsedAll = {};
-      for (const path5 of optionPaths) {
+      for (const path6 of optionPaths) {
         try {
-          const parsed = DotenvModule.parse(fs4.readFileSync(path5, { encoding }));
+          const parsed = DotenvModule.parse(fs5.readFileSync(path6, { encoding }));
           DotenvModule.populate(parsedAll, parsed, options);
         } catch (e) {
           if (debug) {
-            _debug(`failed to load ${path5} ${e.message}`);
+            _debug(`failed to load ${path6} ${e.message}`);
           }
           lastError = e;
         }
@@ -3671,7 +3671,7 @@ var require_main = __commonJS({
         const shortPaths = [];
         for (const filePath of optionPaths) {
           try {
-            const relative = path4.relative(process.cwd(), filePath);
+            const relative = path5.relative(process.cwd(), filePath);
             shortPaths.push(relative);
           } catch (e) {
             if (debug) {
@@ -5164,12 +5164,166 @@ function registerChats(program2, run) {
   program2.command("notifications").description("\u0423\u0432\u0435\u0434\u043E\u043C\u043B\u0435\u043D\u0438\u044F: \u0443\u043F\u043E\u043C\u0438\u043D\u0430\u043D\u0438\u044F, \u043F\u043E\u0440\u0443\u0447\u0435\u043D\u0438\u044F, \u043F\u0440\u0438\u0433\u043B\u0430\u0448\u0435\u043D\u0438\u044F").option("--limit <n>", "\u0441\u043A\u043E\u043B\u044C\u043A\u043E (\u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E 20, \u043C\u0430\u043A\u0441\u0438\u043C\u0443\u043C 50)").option("--before <\u043A\u0443\u0440\u0441\u043E\u0440>", "\u0437\u043D\u0430\u0447\u0435\u043D\u0438\u0435 next \u0438\u0437 \u043F\u0440\u043E\u0448\u043B\u043E\u0433\u043E \u043E\u0442\u0432\u0435\u0442\u0430").action((opts) => run((ctx) => notifications(ctx, opts)));
 }
 
+// src/commands/disk.ts
+var import_node_fs3 = __toESM(require("node:fs"), 1);
+var import_node_path3 = __toESM(require("node:path"), 1);
+var DEFAULT_MAX_MB = 100;
+var MAX_MB = 1024;
+var MAX_NAME_SUFFIX = 1e3;
+var MAX_GROUP_STORAGE_IDS = 50;
+var isStartCursor = (v) => isObject2(v) && typeof v.s === "number" && Number.isSafeInteger(v.s) && v.s >= 0;
+function invalid3(code, message) {
+  return new AppError({ code, userMessage: message });
+}
+function storageOf(s) {
+  return { id: num(s.ID), name: str(s.NAME), type: str(s.ENTITY_TYPE), entityId: str(s.ENTITY_ID) };
+}
+function entryOf(e) {
+  return {
+    id: num(e.ID),
+    name: str(e.NAME),
+    type: str(e.TYPE),
+    ...str(e.TYPE) === "file" ? { size: num(e.SIZE) } : {},
+    updatedAt: str(e.UPDATE_TIME) || null,
+    updatedBy: num(e.UPDATED_BY)
+  };
+}
+async function diskStorages(ctx, opts) {
+  if (opts.all) {
+    const start = opts.page ? decodeCursor(opts.page, "--page", isStartCursor).s : 0;
+    const resp = await ctx.client.call("disk.storage.getlist", { filter: {}, start });
+    const next = typeof resp.next === "number" ? encodeCursor({ s: resp.next }) : null;
+    return envelope(asArray(resp.result).filter(isObject2).map(storageOf), next, next ? ["\u0415\u0441\u0442\u044C \u0435\u0449\u0451 \u0445\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0430: --page <next>."] : []);
+  }
+  const groups = await ctx.client.call("sonet_group.user.groups");
+  const groupIds = asArray(groups.result).filter(isObject2).map((g) => num(g.GROUP_ID)).filter((id) => id !== null).slice(0, MAX_GROUP_STORAGE_IDS);
+  const own = await ctx.client.call("disk.storage.getlist", { filter: { ENTITY_TYPE: "user", ENTITY_ID: ctx.webhook.userId } });
+  const common = await ctx.client.call("disk.storage.getlist", { filter: { ENTITY_TYPE: "common" } });
+  const result = [...asArray(own.result), ...asArray(common.result)];
+  if (groupIds.length > 0) {
+    const group = await ctx.client.call("disk.storage.getlist", { filter: { ENTITY_TYPE: "group", "@ENTITY_ID": groupIds } });
+    result.push(...asArray(group.result));
+  }
+  return envelope(result.filter(isObject2).map(storageOf), null, ["\u0412\u0441\u0435 \u0445\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0430, \u043A\u043E\u0442\u043E\u0440\u044B\u0435 \u0432\u0430\u043C \u0432\u0438\u0434\u043D\u044B, \u2014 disk storages --all."]);
+}
+async function diskLs(ctx, target, opts) {
+  const match = /^(storage|folder):(\d+)$/.exec(target.trim());
+  if (!match) {
+    throw invalid3("APP_CLI_INVALID_ARGUMENT", `\u041F\u0430\u0440\u0430\u043C\u0435\u0442\u0440 \u043F\u0430\u043F\u043A\u0430: \u043E\u0436\u0438\u0434\u0430\u0435\u0442\u0441\u044F storage:<\u043D\u043E\u043C\u0435\u0440> \u0438\u043B\u0438 folder:<\u043D\u043E\u043C\u0435\u0440>, \u043F\u043E\u043B\u0443\u0447\u0435\u043D\u043E \xAB${target}\xBB.`);
+  }
+  const start = opts.page ? decodeCursor(opts.page, "--page", isStartCursor).s : 0;
+  const method = match[1] === "storage" ? "disk.storage.getchildren" : "disk.folder.getchildren";
+  const resp = await ctx.client.call(method, { id: Number(match[2]), start });
+  const data = asArray(resp.result).filter(isObject2).map(entryOf);
+  const next = typeof resp.next === "number" ? encodeCursor({ s: resp.next }) : null;
+  const notes = data.length === 0 ? ["\u041F\u0430\u043F\u043A\u0430 \u043F\u0443\u0441\u0442\u0430."] : next ? ["\u0415\u0441\u0442\u044C \u0435\u0449\u0451: --page <next>."] : [];
+  return envelope(data, next, notes);
+}
+async function diskSearch(ctx, text, opts) {
+  const query = text.trim().replace(/\s+/g, " ");
+  if (query.length < 3) {
+    throw invalid3("APP_CLI_INVALID_ARGUMENT", "\u041F\u0430\u0440\u0430\u043C\u0435\u0442\u0440 \u0442\u0435\u043A\u0441\u0442: \u043D\u0443\u0436\u043D\u043E \u043D\u0435 \u043C\u0435\u043D\u044C\u0448\u0435 3 \u0441\u0438\u043C\u0432\u043E\u043B\u043E\u0432.");
+  }
+  const limit = parseLimit(opts.limit, 20, 50);
+  const filter = {};
+  if (opts.storage) filter.STORAGE_ID = parseId(opts.storage, "--storage");
+  if (opts.folder) filter.FOLDER_ID = parseId(opts.folder, "--folder");
+  const start = opts.page ? decodeCursor(opts.page, "--page", isStartCursor).s : 0;
+  const params = { QUERY: query, TYPE: "file", start };
+  if (Object.keys(filter).length > 0) params.FILTER = filter;
+  const resp = await ctx.client.call("disk.file.search", params);
+  const data = asArray(resp.result).filter(isObject2).slice(0, limit).map((f) => ({ ...entryOf(f), storageId: num(f.STORAGE_ID), folderId: num(f.PARENT_ID) }));
+  const next = typeof resp.next === "number" ? encodeCursor({ s: resp.next }) : null;
+  const notes = data.length === 0 ? ["\u041D\u0438\u0447\u0435\u0433\u043E \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u043E. \u041F\u043E\u0438\u0441\u043A \u043D\u0435 \u043E\u0445\u0432\u0430\u0442\u044B\u0432\u0430\u0435\u0442 \u0444\u0430\u0439\u043B\u044B \u0447\u0430\u0442\u043E\u0432."] : next ? ["\u0415\u0441\u0442\u044C \u0435\u0449\u0451: --page <next>."] : [];
+  return envelope(data, next, notes);
+}
+function fileInfo(f) {
+  return {
+    id: num(f.ID),
+    name: str(f.NAME),
+    size: num(f.SIZE),
+    storageId: num(f.STORAGE_ID),
+    folderId: num(f.PARENT_ID),
+    createdAt: str(f.CREATE_TIME) || null,
+    updatedAt: str(f.UPDATE_TIME) || null,
+    createdBy: num(f.CREATED_BY),
+    updatedBy: num(f.UPDATED_BY)
+  };
+}
+async function diskFile(ctx, idRaw) {
+  const resp = await ctx.client.call("disk.file.get", { id: parseId(idRaw, "id") });
+  return envelope(fileInfo(isObject2(resp.result) ? resp.result : {}));
+}
+function safeFileName(raw) {
+  const base = raw.split(/[\\/]/).pop() ?? "";
+  const cleaned = base.replace(/[\u0000-\u001f<>:"|?*]/g, "_").trim();
+  return cleaned === "" || cleaned === "." || cleaned === ".." ? "file" : cleaned;
+}
+function uniquePath(dir, name) {
+  const ext = import_node_path3.default.extname(name);
+  const stem = ext ? name.slice(0, -ext.length) : name;
+  for (let i = 0; i <= MAX_NAME_SUFFIX; i++) {
+    const candidate = import_node_path3.default.join(dir, i === 0 ? name : `${stem} (${i})${ext}`);
+    if (!import_node_fs3.default.existsSync(candidate)) return candidate;
+  }
+  throw invalid3("APP_B24_OUTPUT_DIR_INVALID", `\u0412 \u043F\u0430\u043F\u043A\u0435 \u0441\u043B\u0438\u0448\u043A\u043E\u043C \u043C\u043D\u043E\u0433\u043E \u0444\u0430\u0439\u043B\u043E\u0432 \u0441 \u0438\u043C\u0435\u043D\u0435\u043C \xAB${name}\xBB.`);
+}
+async function diskDownload(ctx, idRaw, opts) {
+  if (!opts.out?.trim()) {
+    throw invalid3("APP_B24_OUTPUT_DIR_REQUIRED", "\u0423\u043A\u0430\u0436\u0438\u0442\u0435 \u043F\u0430\u043F\u043A\u0443 \u0434\u043B\u044F \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F: --out <\u043F\u0430\u043F\u043A\u0430>.");
+  }
+  const dir = import_node_path3.default.resolve(opts.out.trim());
+  try {
+    if (!import_node_fs3.default.statSync(dir).isDirectory()) throw new Error("not a directory");
+    import_node_fs3.default.accessSync(dir, import_node_fs3.default.constants.W_OK);
+  } catch (err) {
+    throw new AppError({
+      code: "APP_B24_OUTPUT_DIR_INVALID",
+      userMessage: `\u041F\u0430\u043F\u043A\u0430 \u0434\u043B\u044F \u0441\u043E\u0445\u0440\u0430\u043D\u0435\u043D\u0438\u044F \u043D\u0435 \u0441\u0443\u0449\u0435\u0441\u0442\u0432\u0443\u0435\u0442 \u0438\u043B\u0438 \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u043D\u0430 \u0434\u043B\u044F \u0437\u0430\u043F\u0438\u0441\u0438: ${dir}.`,
+      cause: err
+    });
+  }
+  const maxMb = opts.maxMb ? parsePositiveInt(opts.maxMb, "--max-mb", MAX_MB) : DEFAULT_MAX_MB;
+  const resp = await ctx.client.call("disk.file.get", { id: parseId(idRaw, "id") });
+  const f = isObject2(resp.result) ? resp.result : {};
+  const size = num(f.SIZE);
+  const url = str(f.DOWNLOAD_URL);
+  if (size === null || url === "") {
+    throw new AppError({
+      code: "APP_B24_UNEXPECTED_RESPONSE",
+      userMessage: "\u0411\u0438\u0442\u0440\u0438\u043A\u044124 \u0432\u0435\u0440\u043D\u0443\u043B \u0434\u0430\u043D\u043D\u044B\u0435 \u0432 \u043D\u0435\u043E\u0436\u0438\u0434\u0430\u043D\u043D\u043E\u043C \u0432\u0438\u0434\u0435 \u2014 \u043A\u043E\u043C\u0430\u043D\u0434\u0430 \u043D\u0435 \u043C\u043E\u0436\u0435\u0442 \u0438\u0445 \u0440\u0430\u0437\u043E\u0431\u0440\u0430\u0442\u044C.",
+      details: { field: "disk.file.get.SIZE/DOWNLOAD_URL" }
+    });
+  }
+  const name = safeFileName(str(f.NAME));
+  if (size > maxMb * 1024 * 1024) {
+    throw new AppError({
+      code: "APP_B24_FILE_TOO_LARGE",
+      userMessage: `\u0424\u0430\u0439\u043B \xAB${name}\xBB \u0432\u0435\u0441\u0438\u0442 ${Math.ceil(size / 1024 / 1024)} \u041C\u0411 \u2014 \u0431\u043E\u043B\u044C\u0448\u0435 \u043B\u0438\u043C\u0438\u0442\u0430 ${maxMb} \u041C\u0411. \u0427\u0442\u043E\u0431\u044B \u0441\u043A\u0430\u0447\u0430\u0442\u044C, \u0434\u043E\u0431\u0430\u0432\u044C\u0442\u0435 --max-mb <\u0447\u0438\u0441\u043B\u043E>.`
+    });
+  }
+  const saved = await ctx.client.download(url, uniquePath(dir, name), size, maxMb * 1024 * 1024);
+  return envelope({ path: saved.path, name: import_node_path3.default.basename(saved.path), size: saved.size });
+}
+
+// src/cli/register-disk.ts
+function registerDisk(program2, run) {
+  const disk = program2.command("disk").description("\u0424\u0430\u0439\u043B\u044B \u043D\u0430 \u0414\u0438\u0441\u043A\u0435");
+  disk.command("storages").description("\u0413\u0434\u0435 \u0438\u0441\u043A\u0430\u0442\u044C \u0444\u0430\u0439\u043B\u044B: \u043C\u043E\u0439 \u0434\u0438\u0441\u043A, \u043E\u0431\u0449\u0438\u0439, \u0434\u0438\u0441\u043A\u0438 \u043C\u043E\u0438\u0445 \u0433\u0440\u0443\u043F\u043F").option("--all", "\u0432\u0441\u0435 \u0445\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0430, \u043A\u043E\u0442\u043E\u0440\u044B\u0435 \u043C\u043D\u0435 \u0432\u0438\u0434\u043D\u044B").option("--page <\u043A\u0443\u0440\u0441\u043E\u0440>", "\u0437\u043D\u0430\u0447\u0435\u043D\u0438\u0435 next (\u0441 --all)").action((opts) => run((ctx) => diskStorages(ctx, opts)));
+  disk.command("ls").description("\u0421\u043E\u0434\u0435\u0440\u0436\u0438\u043C\u043E\u0435 \u0445\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0430 \u0438\u043B\u0438 \u043F\u0430\u043F\u043A\u0438").argument("<\u043F\u0430\u043F\u043A\u0430>", "storage:<\u043D\u043E\u043C\u0435\u0440> \u0438\u043B\u0438 folder:<\u043D\u043E\u043C\u0435\u0440>").option("--page <\u043A\u0443\u0440\u0441\u043E\u0440>", "\u0437\u043D\u0430\u0447\u0435\u043D\u0438\u0435 next \u0438\u0437 \u043F\u0440\u043E\u0448\u043B\u043E\u0433\u043E \u043E\u0442\u0432\u0435\u0442\u0430").action((target, opts) => run((ctx) => diskLs(ctx, target, opts)));
+  disk.command("search").description("\u041D\u0430\u0439\u0442\u0438 \u0444\u0430\u0439\u043B \u043F\u043E \u043D\u0430\u0437\u0432\u0430\u043D\u0438\u044E \u0438 \u0442\u0435\u043A\u0441\u0442\u0443 \u0434\u043E\u043A\u0443\u043C\u0435\u043D\u0442\u0430 (\u0444\u0430\u0439\u043B\u044B \u0447\u0430\u0442\u043E\u0432 \u043D\u0435 \u043E\u0445\u0432\u0430\u0442\u044B\u0432\u0430\u0435\u0442)").argument("<\u0442\u0435\u043A\u0441\u0442>", "\u043D\u0435 \u043C\u0435\u043D\u044C\u0448\u0435 3 \u0441\u0438\u043C\u0432\u043E\u043B\u043E\u0432").option("--storage <id>", "\u0442\u043E\u043B\u044C\u043A\u043E \u0432 \u0445\u0440\u0430\u043D\u0438\u043B\u0438\u0449\u0435").option("--folder <id>", "\u0442\u043E\u043B\u044C\u043A\u043E \u0432 \u043F\u0430\u043F\u043A\u0435").option("--limit <n>", "\u0441\u043A\u043E\u043B\u044C\u043A\u043E (\u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E 20, \u043C\u0430\u043A\u0441\u0438\u043C\u0443\u043C 50)").option("--page <\u043A\u0443\u0440\u0441\u043E\u0440>", "\u0437\u043D\u0430\u0447\u0435\u043D\u0438\u0435 next \u0438\u0437 \u043F\u0440\u043E\u0448\u043B\u043E\u0433\u043E \u043E\u0442\u0432\u0435\u0442\u0430").action(
+    (text, opts) => run((ctx) => diskSearch(ctx, text, opts))
+  );
+  disk.command("file").description("\u0421\u0432\u0435\u0434\u0435\u043D\u0438\u044F \u043E \u0444\u0430\u0439\u043B\u0435, \u0432 \u0442\u043E\u043C \u0447\u0438\u0441\u043B\u0435 \u043E \u0432\u043B\u043E\u0436\u0435\u043D\u0438\u0438 \u0438\u0437 \u0447\u0430\u0442\u0430 (fileId)").argument("<id>", "\u043D\u043E\u043C\u0435\u0440 \u0444\u0430\u0439\u043B\u0430").action((id) => run((ctx) => diskFile(ctx, id)));
+  disk.command("download").description("\u0421\u043A\u0430\u0447\u0430\u0442\u044C \u0444\u0430\u0439\u043B \u0432 \u043F\u0430\u043F\u043A\u0443, \u0447\u0442\u043E\u0431\u044B \u043F\u0440\u043E\u0447\u0438\u0442\u0430\u0442\u044C \u0435\u0433\u043E").argument("<id>", "\u043D\u043E\u043C\u0435\u0440 \u0444\u0430\u0439\u043B\u0430").option("--out <\u043F\u0430\u043F\u043A\u0430>", "\u043A\u0443\u0434\u0430 \u0441\u043E\u0445\u0440\u0430\u043D\u0438\u0442\u044C (\u043E\u0431\u044F\u0437\u0430\u0442\u0435\u043B\u044C\u043D\u043E)").option("--max-mb <n>", "\u043F\u0440\u0435\u0434\u0435\u043B \u0440\u0430\u0437\u043C\u0435\u0440\u0430 (\u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E 100, \u043C\u0430\u043A\u0441\u0438\u043C\u0443\u043C 1024)").action((id, opts) => run((ctx) => diskDownload(ctx, id, opts)));
+}
+
 // src/commands/projects.ts
 var GROUP_TYPES = ["group", "project", "scrum", "collab"];
 var PAGE2 = 50;
 var MAX_PAGES = 10;
 var ROLE_NAMES = { A: "\u0432\u043B\u0430\u0434\u0435\u043B\u0435\u0446", E: "\u043C\u043E\u0434\u0435\u0440\u0430\u0442\u043E\u0440", K: "\u0443\u0447\u0430\u0441\u0442\u043D\u0438\u043A", Z: "\u0437\u0430\u043F\u0440\u043E\u0441 \u043D\u0430 \u0432\u0441\u0442\u0443\u043F\u043B\u0435\u043D\u0438\u0435" };
-var isStartCursor = (v) => isObject2(v) && typeof v.s === "number" && Number.isSafeInteger(v.s) && v.s >= 0;
+var isStartCursor2 = (v) => isObject2(v) && typeof v.s === "number" && Number.isSafeInteger(v.s) && v.s >= 0;
 function pick(obj, camel, upper) {
   return obj[camel] !== void 0 ? obj[camel] : obj[upper];
 }
@@ -5189,7 +5343,7 @@ async function projectsList(ctx, opts) {
     if (mine.size === 0) return envelope([], null, ["\u0412\u044B \u043D\u0435 \u0441\u043E\u0441\u0442\u043E\u0438\u0442\u0435 \u043D\u0438 \u0432 \u043E\u0434\u043D\u043E\u0439 \u0433\u0440\u0443\u043F\u043F\u0435."]);
     filter.ID = [...mine];
   }
-  let start = opts.page ? decodeCursor(opts.page, "--page", isStartCursor).s : 0;
+  let start = opts.page ? decodeCursor(opts.page, "--page", isStartCursor2).s : 0;
   const collected = [];
   let nextStart = null;
   let stoppedByPages = false;
@@ -5315,8 +5469,8 @@ var GET_SELECT = [
 ];
 var PAGE3 = 50;
 var IM_DIALOG_RE = /IM_DIALOG=(chat\d+|\d+)/g;
-var isStartCursor2 = (v) => isObject2(v) && typeof v.s === "number" && Number.isSafeInteger(v.s) && v.s >= 0;
-function invalid3(message) {
+var isStartCursor3 = (v) => isObject2(v) && typeof v.s === "number" && Number.isSafeInteger(v.s) && v.s >= 0;
+function invalid4(message) {
   return new AppError({ code: "APP_CLI_INVALID_ARGUMENT", userMessage: message });
 }
 function person(raw) {
@@ -5343,13 +5497,13 @@ async function tasksList(ctx, opts) {
   const role = opts.role ?? "any";
   const status2 = opts.status ?? "active";
   if (role !== "any" && !ROLE_FIELDS[role]) {
-    throw invalid3(`\u041F\u0430\u0440\u0430\u043C\u0435\u0442\u0440 --role: \u043E\u0436\u0438\u0434\u0430\u0435\u0442\u0441\u044F responsible | creator | accomplice | auditor | any, \u043F\u043E\u043B\u0443\u0447\u0435\u043D\u043E \xAB${role}\xBB.`);
+    throw invalid4(`\u041F\u0430\u0440\u0430\u043C\u0435\u0442\u0440 --role: \u043E\u0436\u0438\u0434\u0430\u0435\u0442\u0441\u044F responsible | creator | accomplice | auditor | any, \u043F\u043E\u043B\u0443\u0447\u0435\u043D\u043E \xAB${role}\xBB.`);
   }
   if (!["active", "done", "all"].includes(status2)) {
-    throw invalid3(`\u041F\u0430\u0440\u0430\u043C\u0435\u0442\u0440 --status: \u043E\u0436\u0438\u0434\u0430\u0435\u0442\u0441\u044F active | done | all, \u043F\u043E\u043B\u0443\u0447\u0435\u043D\u043E \xAB${status2}\xBB.`);
+    throw invalid4(`\u041F\u0430\u0440\u0430\u043C\u0435\u0442\u0440 --status: \u043E\u0436\u0438\u0434\u0430\u0435\u0442\u0441\u044F active | done | all, \u043F\u043E\u043B\u0443\u0447\u0435\u043D\u043E \xAB${status2}\xBB.`);
   }
   if (opts.page && role === "any") {
-    throw invalid3("\u041F\u0430\u0440\u0430\u043C\u0435\u0442\u0440 --page \u0440\u0430\u0431\u043E\u0442\u0430\u0435\u0442 \u0442\u043E\u043B\u044C\u043A\u043E \u0441 \u043E\u0434\u043D\u043E\u0439 \u0440\u043E\u043B\u044C\u044E: \u0443\u043A\u0430\u0436\u0438\u0442\u0435 --role.");
+    throw invalid4("\u041F\u0430\u0440\u0430\u043C\u0435\u0442\u0440 --page \u0440\u0430\u0431\u043E\u0442\u0430\u0435\u0442 \u0442\u043E\u043B\u044C\u043A\u043E \u0441 \u043E\u0434\u043D\u043E\u0439 \u0440\u043E\u043B\u044C\u044E: \u0443\u043A\u0430\u0436\u0438\u0442\u0435 --role.");
   }
   const limit = parseLimit(opts.limit, 20, PAGE3);
   const base = {};
@@ -5357,7 +5511,7 @@ async function tasksList(ctx, opts) {
   if (status2 === "done") base.REAL_STATUS = 5;
   if (opts.project) base.GROUP_ID = parseId(opts.project, "--project");
   if (opts.search?.trim()) base["%TITLE"] = opts.search.trim();
-  const start = opts.page ? decodeCursor(opts.page, "--page", isStartCursor2).s : 0;
+  const start = opts.page ? decodeCursor(opts.page, "--page", isStartCursor3).s : 0;
   const roles = role === "any" ? Object.keys(ROLE_FIELDS) : [role];
   const merged = /* @__PURE__ */ new Map();
   let next;
@@ -5443,8 +5597,8 @@ function registerProjectsTasks(program2, run) {
 }
 
 // src/commands/update-check.ts
-var import_node_fs3 = __toESM(require("node:fs"), 1);
-var import_node_path3 = __toESM(require("node:path"), 1);
+var import_node_fs4 = __toESM(require("node:fs"), 1);
+var import_node_path4 = __toESM(require("node:path"), 1);
 function parseVersion(value) {
   const normalized = value.trim().replace(/^v/i, "");
   return /^\d+(\.\d+)*$/.test(normalized) ? normalized.split(".").map(Number) : null;
@@ -5466,7 +5620,7 @@ function isNewer(latest, current) {
 }
 function readCache(file) {
   try {
-    const parsed = JSON.parse(import_node_fs3.default.readFileSync(file, "utf8"));
+    const parsed = JSON.parse(import_node_fs4.default.readFileSync(file, "utf8"));
     return typeof parsed.checkedAt === "string" && typeof parsed.latestVersion === "string" ? { checkedAt: parsed.checkedAt, latestVersion: parsed.latestVersion } : null;
   } catch {
     return null;
@@ -5474,8 +5628,8 @@ function readCache(file) {
 }
 function writeCache(file, cache) {
   try {
-    import_node_fs3.default.mkdirSync(import_node_path3.default.dirname(file), { recursive: true, mode: 448 });
-    import_node_fs3.default.writeFileSync(file, JSON.stringify(cache), "utf8");
+    import_node_fs4.default.mkdirSync(import_node_path4.default.dirname(file), { recursive: true, mode: 448 });
+    import_node_fs4.default.writeFileSync(file, JSON.stringify(cache), "utf8");
   } catch {
   }
 }
@@ -5618,6 +5772,7 @@ function buildProgram(run = runCommand) {
   registerStatusUsers(program2, run);
   registerChats(program2, run);
   registerProjectsTasks(program2, run);
+  registerDisk(program2, run);
   return program2;
 }
 var HELP_CODES = /* @__PURE__ */ new Set(["commander.helpDisplayed", "commander.help", "commander.version"]);
