@@ -43,8 +43,12 @@ export interface ClientOptions {
 type Json = Record<string, unknown>;
 
 // Пути подписанных ссылок на скачивание (DOWNLOAD_URL из disk.file.get).
-// Расширять только после проверки на живом портале (шаг 0, V5).
-const DOWNLOAD_PATHS: ReadonlySet<string> = new Set(['/rest/download.json']);
+// На живом портале ссылка вида /rest/<номер>/<код вебхука>/download/?token=…
+// (проверено в шаге 0, V5); в документации — /rest/download.json. Код вебхука
+// в такой ссылке — ещё одна причина никогда её не выводить.
+function isDownloadPath(pathname: string, webhook: Webhook): boolean {
+  return pathname === '/rest/download.json' || pathname === `/rest/${webhook.userId}/${webhook.code}/download/`;
+}
 
 function isObject(value: unknown): value is Json {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -221,7 +225,7 @@ export class B24Client {
     if (parsed.origin !== this.webhook.origin) {
       throw fail('foreign-host');
     }
-    if (!DOWNLOAD_PATHS.has(parsed.pathname)) {
+    if (!isDownloadPath(parsed.pathname, this.webhook)) {
       throw fail('not-a-download-link');
     }
 

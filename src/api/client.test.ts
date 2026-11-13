@@ -228,6 +228,25 @@ describe('B24Client.download', () => {
     });
   }
 
+  it('ссылка настоящего портала вида /rest/<номер>/<код>/download/?token=… скачивается, ключ не светится', async () => {
+    const dir = tmp();
+    const real = 'https://example.bitrix24.ru/rest/1/testsecret0000/download/?token=filetoken0000';
+    const fetchFn = vi.fn(async () => new Response(streamOf([new Uint8Array([7, 8])]), { status: 200, headers: { 'Content-Type': 'application/pdf' } }));
+    const { client } = makeClient(fetchFn as unknown as typeof fetch);
+    expect(await client.download(real, path.join(dir, 'a.pdf'), 2, 100)).toEqual({ path: path.join(dir, 'a.pdf'), size: 2 });
+  });
+
+  it.each([
+    ['чужой номер пользователя', 'https://example.bitrix24.ru/rest/2/testsecret0000/download/?token=x'],
+    ['чужой код', 'https://example.bitrix24.ru/rest/1/othercode0000/download/?token=x'],
+    ['метод вместо download', 'https://example.bitrix24.ru/rest/1/testsecret0000/im.message.add/?token=x'],
+  ])('путь скачивания с подменой (%s) — отказ без запроса', async (_name, url) => {
+    const fetchFn = vi.fn();
+    const { client } = makeClient(fetchFn as unknown as typeof fetch);
+    expect(await codeOf(client.download(url, path.join(tmp(), 'x.pdf'), 3, 100))).toBe('APP_B24_DOWNLOAD_FAILED');
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
+
   it('скачивает с четырьмя заголовками и проверяет размер', async () => {
     const dir = tmp();
     const fetchFn = vi.fn(async () => new Response(streamOf([new Uint8Array([1, 2, 3])]), { status: 200, headers: { 'Content-Type': 'application/pdf' } }));
