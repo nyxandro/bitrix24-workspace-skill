@@ -79,7 +79,7 @@ wrong one.
 - The one-line plugin install needs Claude Code 2.1.275 or later. On an older version, add the
   catalog first with `/plugin marketplace add nyxandro/skills`.
 - With `npx skills`, add `-g` to install the skill for every project. To install a given version,
-  add its tag, as in `nyxandro/bitrix24-workspace-skill@v0.1.0`.
+  add its tag, as in `nyxandro/bitrix24-workspace-skill@v0.1.1`.
 - The skill tells you in `status` when a new version appears in the repository.
 
 </details>

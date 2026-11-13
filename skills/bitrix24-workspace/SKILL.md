@@ -1,9 +1,9 @@
 ---
 name: bitrix24-workspace
-description: Read-only access to the user's own Bitrix24 (Битрикс24) workspace through a bundled CLI and an inbound webhook — chats and direct messages, task chats, project and collab chats, notifications, tasks, workgroups/projects/collabs, Drive files (search and download), mail, calendar, AI meeting summaries (CoPilot follow-up), news feed, knowledge base, org structure and work time. Use whenever the user asks what was written or discussed, what is unread, about a task or project, to find or read a file or an email, about meetings, colleagues or company news in Bitrix24 / Битрикс24. Read-only: it cannot send, change or delete anything. Data comes from the live portal via the CLI — never answer from memory.
+description: "Read-only access to the user's own Bitrix24 (Битрикс24) workspace through a bundled CLI and an inbound webhook — chats and direct messages, task chats, project and collab chats, notifications, tasks, workgroups/projects/collabs, Drive files (search and download), mail, calendar, AI meeting summaries (CoPilot follow-up), news feed, knowledge base, org structure and work time. Use whenever the user asks what was written or discussed, what is unread, about a task or project, to find or read a file or an email, about meetings, colleagues or company news in Bitrix24 / Битрикс24. Read-only: it cannot send, change or delete anything. Data comes from the live portal via the CLI — never answer from memory."
 ---
 
-<!-- bitrix24-workspace · версия 0.1.0 · https://github.com/nyxandro/bitrix24-workspace-skill -->
+<!-- bitrix24-workspace · версия 0.1.1 · https://github.com/nyxandro/bitrix24-workspace-skill -->
 
 # Битрикс24 сотрудника — только чтение
 

@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
+import { APP_VERSION } from '../config/config.js';
 import { buildProgram, parseArgs } from './program.js';
 
 describe('buildProgram', () => {
   it('отдаёт версию скилла', () => {
-    expect(buildProgram().version()).toBe('0.1.0');
+    expect(buildProgram().version()).toBe(APP_VERSION);
   });
 
   it('называется b24', () => {

@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { APP_VERSION } from '../config/config.js';
 import { checkForUpdate, isNewer } from './update-check.js';
 
 const dirs: string[] = [];
@@ -24,7 +25,7 @@ describe('update-check', () => {
       throw new TypeError('offline');
     });
     expect(await checkForUpdate({ fetchFn: fetchFn as unknown as typeof fetch, cachePath: cachePath() })).toEqual({
-      currentVersion: '0.1.0',
+      currentVersion: APP_VERSION,
       latestVersion: null,
       updateAvailable: false,
     });

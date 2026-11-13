@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { APP_VERSION } from '../config/config.js';
 import type { Webhook } from '../config/webhook.js';
 import { B24Client } from './client.js';
 import { AppError } from './errors.js';
@@ -54,7 +55,7 @@ describe('B24Client.call (старая версия REST)', () => {
     expect(init.body).toBe('{"LIMIT":50}');
     const headers = new Headers(init.headers);
     expect(headers.get('Content-Type')).toBe('application/json');
-    expect(headers.get('User-Agent')).toBe('bitrix24-workspace-skill/0.1.0');
+    expect(headers.get('User-Agent')).toBe(`bitrix24-workspace-skill/${APP_VERSION}`);
   });
 
   it('метод не из списка — APP_B24_METHOD_NOT_ALLOWED, запроса нет', async () => {
@@ -255,7 +256,7 @@ describe('B24Client.download', () => {
     expect(await client.download(LINK, dest, 3, 100)).toEqual({ path: dest, size: 3 });
     expect(fs.readFileSync(dest)).toEqual(Buffer.from([1, 2, 3]));
     const headers = new Headers((fetchFn.mock.calls[0] as unknown as [string, RequestInit])[1].headers);
-    expect(headers.get('User-Agent')).toBe('bitrix24-workspace-skill/0.1.0');
+    expect(headers.get('User-Agent')).toBe(`bitrix24-workspace-skill/${APP_VERSION}`);
     expect(headers.get('Accept')).toBe('*/*');
     expect(headers.get('Accept-Language')).toBe('ru-RU,ru;q=0.9');
     expect(headers.get('Referer')).toBe('https://example.bitrix24.ru/');

@@ -21,6 +21,19 @@ describe('согласованность выпуска', () => {
     expect(/^## \[([^\]]+)\]/m.exec(read('CHANGELOG.md'))?.[1]).toBe(APP_VERSION);
   });
 
+  // Строгие разборщики YAML (GitHub, часть установщиков) отвергают значение без кавычек,
+  // в котором есть «: » или « #»: шапка скилла тогда не читается вовсе.
+  it('шапка SKILL.md — корректный YAML: значения с двоеточием взяты в кавычки', () => {
+    const header = /^---\n([\s\S]*?)\n---\n/.exec(read('skills', 'bitrix24-workspace', 'SKILL.md'))?.[1] ?? '';
+    const fields = header.split('\n').map((line) => /^([a-z-]+): (.*)$/.exec(line));
+    expect(fields.map((f) => f?.[1])).toEqual(['name', 'description']);
+    for (const field of fields) {
+      const value = field?.[2] ?? '';
+      const quoted = /^"(?:[^"\\]|\\.)*"$/.test(value);
+      expect(quoted || !/: | #|^[[{&*!|>'%@`]/.test(value), `поле ${field?.[1]} нужно взять в кавычки`).toBe(true);
+    }
+  });
+
   it('собранная программа называет ту же версию', () => {
     const out = execFileSync('node', [path.join(SKILL_DIR, 'scripts', 'b24.cjs'), '--version'], { encoding: 'utf8' });
     expect(out.trim()).toBe(APP_VERSION);
