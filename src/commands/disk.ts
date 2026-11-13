@@ -23,12 +23,13 @@ import {
   parseId,
   parseLimit,
   str,
+  unexpected,
 } from './common.js';
 
 const DEFAULT_MAX_MB = 100;
 const MAX_MB = 1024;
 const MAX_NAME_SUFFIX = 1000;
-const MAX_GROUP_STORAGE_IDS = 50;
+const GROUP_IDS_PER_REQUEST = 50; // страница disk.storage.getlist — 50 записей: порция номеров помещается в один ответ
 
 const isStartCursor = (v: unknown): v is { s: number } => isObject(v) && typeof v.s === 'number' && Number.isSafeInteger(v.s) && v.s >= 0;
 
@@ -59,23 +60,28 @@ export async function diskStorages(ctx: CommandContext, opts: { all?: boolean; p
     return envelope(asArray(resp.result).filter(isObject).map(storageOf), next, next ? ['Есть ещё хранилища: --page <next>.'] : []);
   }
   const groups = await ctx.client.call<unknown>('sonet_group.user.groups');
-  const allGroupIds = asArray(groups.result)
+  const groupIds = asArray(groups.result)
     .filter(isObject)
     .map((g) => num(g.GROUP_ID))
     .filter((id): id is number => id !== null);
-  const groupIds = allGroupIds.slice(0, MAX_GROUP_STORAGE_IDS);
   const own = await ctx.client.call<unknown>('disk.storage.getlist', { filter: { ENTITY_TYPE: 'user', ENTITY_ID: ctx.webhook.userId } });
   const common = await ctx.client.call<unknown>('disk.storage.getlist', { filter: { ENTITY_TYPE: 'common' } });
   const result = [...asArray(own.result), ...asArray(common.result)];
-  if (groupIds.length > 0) {
-    const group = await ctx.client.call<unknown>('disk.storage.getlist', { filter: { ENTITY_TYPE: 'group', '@ENTITY_ID': groupIds } });
-    result.push(...asArray(group.result));
+  for (let i = 0; i < groupIds.length; i += GROUP_IDS_PER_REQUEST) {
+    const wanted = new Set(groupIds.slice(i, i + GROUP_IDS_PER_REQUEST));
+    // Список номеров Битрикс принимает только в поле ENTITY_ID без приставки: условие
+    // «@ENTITY_ID» он молча отбрасывает и отдаёт первые 50 дисков всех групп портала
+    // (проверено на живом портале).
+    const group = await ctx.client.call<unknown>('disk.storage.getlist', { filter: { ENTITY_TYPE: 'group', ENTITY_ID: [...wanted] } });
+    const storages = asArray(group.result).filter(isObject);
+    // Диск чужой группы в ответе значит, что отбор не сработал: показывать такой
+    // список под видом «своих» нельзя.
+    if (storages.some((s) => !wanted.has(num(s.ENTITY_ID) ?? -1))) {
+      throw unexpected('disk.storage.getlist.filter');
+    }
+    result.push(...storages);
   }
-  const notes = ['Все хранилища, которые вам видны, — disk storages --all.'];
-  if (allGroupIds.length > groupIds.length) {
-    notes.unshift(`Диски групп показаны только для первых ${groupIds.length} из ${allGroupIds.length} ваших групп; остальные — disk storages --all.`);
-  }
-  return envelope(result.filter(isObject).map(storageOf), null, notes);
+  return envelope(result.filter(isObject).map(storageOf), null, ['Все хранилища, которые вам видны, — disk storages --all.']);
 }
 
 export async function diskLs(ctx: CommandContext, target: string, opts: { page?: string }): Promise<Envelope> {

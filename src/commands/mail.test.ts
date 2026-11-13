@@ -41,6 +41,15 @@ describe('mail', () => {
     expect(((await mailGet(ctx, '16', {})).data as M).text).toBe('строка 1\nстрока 2');
   });
 
+  it('get — стили в начале тела убраны, и об этом сказано в пометке', async () => {
+    const { ctx } = fakeContext({ 'mail.message.get': () => ({ json: { result: { item: letter(17, 'body { margin: 0; }\r\ntd { padding: 0; }\r\n\r\nДобрый день') } } }) });
+    const out = await mailGet(ctx, '17', {});
+    expect((out.data as M).text).toBe('Добрый день');
+    expect(out.notes.join(' ')).toContain('стили');
+    const clean = fakeContext({ 'mail.message.get': () => ({ json: { result: { item: letter(18, 'Добрый день') } } }) });
+    expect((await mailGet(clean.ctx, '18', {})).notes).toEqual([]);
+  });
+
   it('thread — цепочка с началом текста', async () => {
     const { ctx, calls } = fakeContext({ 'mail.message.thread': () => ({ json: { result: { items: [letter(1, 'а'.repeat(1000)), letter(2)] } } }) });
     const data = (await mailThread(ctx, '1', {})).data as M[];

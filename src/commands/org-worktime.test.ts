@@ -48,6 +48,15 @@ describe('worktime', () => {
     await expect(worktimeStatus(ctx)).rejects.toMatchObject({ code: 'APP_B24_UNEXPECTED_RESPONSE' });
   });
 
+  it('records — состояние записи приходит объектом: показываем его статус, а не [object Object]', async () => {
+    const { ctx } = fakeContext({
+      'timeman.record.list': () => ({ json: { result: { items: [{ id: 1, startTime: '2026-03-17T13:31:14+03:00', endTime: '2026-03-17T13:45:25+03:00', duration: 851, breakLength: 0, state: { status: 'closed', recommendedCloseTime: null }, isApproved: true }] } } }),
+    });
+    const data = (await worktimeRecords(ctx, { from: '2026-03-01', to: '2026-03-31' })).data as M;
+    expect((data.records as M[])[0]).toMatchObject({ state: 'закрыт', approved: true });
+    expect(JSON.stringify(data)).not.toContain('[object');
+  });
+
   it('status — по-русски', async () => {
     const { ctx } = fakeContext({ 'timeman.status': () => ({ json: { result: { STATUS: 'CLOSED', TIME_START: '2026-11-13T09:00:00+03:00', TIME_FINISH: '2026-11-13T18:00:00+03:00', DURATION: '08:00:00', TIME_LEAKS: '01:00:00' } } }) });
     expect((await worktimeStatus(ctx)).data).toEqual({ status: 'закрыт', start: '2026-11-13T09:00:00+03:00', finish: '2026-11-13T18:00:00+03:00', duration: '08:00:00', breaks: '01:00:00' });
@@ -61,6 +70,6 @@ describe('worktime', () => {
     const data = (await worktimeRecords(ctx, { from: '2026-11-01', to: '2026-11-30' })).data as M;
     expect(calls[0]?.body).toMatchObject({ filter: [['userId', 1], ['startTime', 'between', ['2026-11-01T00:00:00+03:00', '2026-11-30T23:59:59+03:00']]] });
     expect(data.totalSeconds).toBe(54000);
-    expect((data.records as M[])[0]).toEqual({ id: 1, start: '2026-11-10T09:00:00+03:00', end: '2026-11-10T18:00:00+03:00', durationSeconds: 28800, breakSeconds: 3600, state: 'CLOSED' });
+    expect((data.records as M[])[0]).toEqual({ id: 1, start: '2026-11-10T09:00:00+03:00', end: '2026-11-10T18:00:00+03:00', durationSeconds: 28800, breakSeconds: 3600, state: 'закрыт', approved: null });
   });
 });

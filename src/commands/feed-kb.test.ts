@@ -63,6 +63,16 @@ describe('feed', () => {
   });
 });
 
+describe('feed: чистый текст', () => {
+  it('в заголовке раскодируются сущности, переводы строк Windows приводятся к обычным', async () => {
+    const raw = { ...post(7, 'Всем привет!\r\n\r\nПродукт &quot;Мониторинг&quot;'), TITLE: 'Всем привет! Продукт &quot;Мониторинг&quot; &#8470;5 &laquo;x&raquo; &mdash; a&copy=1' };
+    const { ctx } = fakeContext({ 'log.blogpost.get': () => ({ json: { result: [raw] } }), 'log.blogcomment.get': () => ({ json: { result: { COMMENTS: [] } } }), 'user.get': users });
+    const listed = ((await feedList(ctx, {})).data as M[])[0] as M;
+    expect(listed).toMatchObject({ title: 'Всем привет! Продукт "Мониторинг" №5 «x» — a&copy=1', text: 'Всем привет!\n\nПродукт "Мониторинг"' });
+    expect((await feedPost(ctx, '7', {})).data).toMatchObject({ title: 'Всем привет! Продукт "Мониторинг" №5 «x» — a&copy=1', text: 'Всем привет!\n\nПродукт "Мониторинг"' });
+  });
+});
+
 describe('feed post: комментариев больше, чем показано', () => {
   it('commentsTotal и пометка, как дочитать', async () => {
     const { ctx } = fakeContext({

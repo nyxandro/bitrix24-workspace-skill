@@ -31,7 +31,9 @@ describe('disk storages', () => {
     expect(calls.filter((c) => c.method === 'disk.storage.getlist').map((c) => c.body.filter)).toEqual([
       { ENTITY_TYPE: 'user', ENTITY_ID: 1 },
       { ENTITY_TYPE: 'common' },
-      { ENTITY_TYPE: 'group', '@ENTITY_ID': [15, 20] },
+      // Список номеров — только в поле ENTITY_ID без приставки: «@ENTITY_ID» Битрикс молча
+      // отбрасывает и отдаёт диски чужих групп (проверено на живом портале).
+      { ENTITY_TYPE: 'group', ENTITY_ID: [15, 20] },
     ]);
     expect(out.data).toEqual([
       { id: 1, name: 'Мой диск', type: 'user', entityId: '1' },
@@ -42,15 +44,32 @@ describe('disk storages', () => {
 });
 
 describe('disk ls, search, file', () => {
-  it('групп больше 50 — диски показаны только для первых 50, и об этом сказано', async () => {
+  it('групп больше 50 — диски запрашиваются порциями по 50, ни одна группа не теряется', async () => {
     const { ctx, calls } = fakeContext({
       'sonet_group.user.groups': () => ({ json: { result: Array.from({ length: 60 }, (_, i) => ({ GROUP_ID: String(i + 1) })) } }),
-      'disk.storage.getlist': () => ({ json: { result: [] } }),
+      'disk.storage.getlist': (b) => {
+        const f = b.filter as M;
+        const ids = f.ENTITY_TYPE === 'group' ? (f.ENTITY_ID as number[]) : [];
+        return { json: { result: ids.map((id) => ({ ID: String(1000 + id), NAME: `Диск ${id}`, ENTITY_TYPE: 'group', ENTITY_ID: String(id) })) } };
+      },
     });
     const out = await diskStorages(ctx, {});
-    const groupCall = calls.filter((c) => c.method === 'disk.storage.getlist')[2];
-    expect(((groupCall?.body.filter as M)['@ENTITY_ID'] as number[]).length).toBe(50);
-    expect(out.notes.join(' ')).toContain('первых 50 из 60');
+    const groupCalls = calls.filter((c) => c.method === 'disk.storage.getlist').slice(2);
+    expect(groupCalls.map((c) => ((c.body.filter as M).ENTITY_ID as number[]).length)).toEqual([50, 10]);
+    expect((out.data as M[]).filter((s) => s.type === 'group')).toHaveLength(60);
+    expect(out.notes.join(' ')).not.toContain('первых');
+  });
+
+  it('Битрикс не применил отбор и вернул диск чужой группы — ошибка, а не чужие диски под видом своих', async () => {
+    const { ctx } = fakeContext({
+      'sonet_group.user.groups': () => ({ json: { result: [{ GROUP_ID: '15' }] } }),
+      'disk.storage.getlist': [
+        () => ({ json: { result: [] } }),
+        () => ({ json: { result: [] } }),
+        () => ({ json: { result: [{ ID: '3', NAME: 'Моя', ENTITY_TYPE: 'group', ENTITY_ID: '15' }, { ID: '4', NAME: 'Чужая', ENTITY_TYPE: 'group', ENTITY_ID: '99' }] } }),
+      ],
+    });
+    await expect(diskStorages(ctx, {})).rejects.toMatchObject({ code: 'APP_B24_UNEXPECTED_RESPONSE' });
   });
 
   it('ls storage:N / folder:N, без ссылок', async () => {

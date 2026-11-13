@@ -6,6 +6,8 @@
  *   Поле *_TS_UTC вопреки имени сдвинуто на зону сервера, по документации его
  *   нельзя читать как UTC. DATE_* приходит в записи портала: «11/20/2026 10:00:00 am»,
  *   «20.11.2026 10:00:00» или «2026-11-20 10:00:00»;
+ * - toZone(raw, tz) — готовое мгновение со смещением (в том числе в UTC) → то же мгновение
+ *   в зоне читателя; всё остальное возвращается как есть;
  * - parseInputDate(raw, edge, option, tz) — ввод агента: дата без времени — первое
  *   или последнее мгновение этого дня в зоне машины.
  */
@@ -204,6 +206,16 @@ function invalidDate(option: string, raw: string): AppError {
 function nextDay(y: number, m: number, d: number): [number, number, number] {
   const next = new Date(Date.UTC(y, m - 1, d + 1));
   return [next.getUTCFullYear(), next.getUTCMonth() + 1, next.getUTCDate()];
+}
+
+// Мгновение со смещением → то же мгновение в зоне читателя. Нужна там, где Битрикс
+// отдаёт время в UTC (итоги встреч): иначе «15:31+00:00» читается как 15:31 по местному.
+export function toZone(raw: string, tz: string): string {
+  if (!ZONED_DATETIME_RE.test(raw)) {
+    return raw;
+  }
+  const epoch = Date.parse(raw);
+  return Number.isFinite(epoch) ? formatInZone(epoch, tz) : raw;
 }
 
 export function parseInputDate(raw: string, edge: 'start' | 'end', option: string, tz: string = machineTimeZone()): string {

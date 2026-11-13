@@ -1,6 +1,6 @@
 {
   "name": "bitrix24-workspace-skill",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Скилл + CLI только на чтение для ИИ-агентов: чаты, задачи, проекты, диск, почта, календарь, встречи, лента, база знаний Битрикс24 через входящий вебхук",
   "type": "module",
   "private": true,
@@ -19,6 +19,7 @@
   "dependencies": {
     "commander": "^14.0.3",
     "dotenv": "^17.4.2",
+    "entities": "^7.0.1",
     "html-to-text": "^10.0.1"
   },
   "devDependencies": {

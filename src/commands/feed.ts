@@ -1,6 +1,7 @@
 /**
  * feed list|post — живая лента (новости компании) и комментарии.
  */
+import { decodeHTMLStrict } from 'entities';
 import { MAX_TEXT_CHARS } from '../config/config.js';
 import { parseInputDate } from '../render/dates.js';
 import { htmlToText, looksLikeHtml } from '../render/html.js';
@@ -31,8 +32,14 @@ const MAX_COMMENTS = 50;
 const isFeedCursor = (v: unknown): v is { l: number } => isObject(v) && Number.isSafeInteger(v.l) && (v.l as number) > 0;
 
 function plain(raw: string, tz: string): string {
-  const text = bbToText(raw, new Map(), tz);
+  const text = bbToText(raw, new Map(), tz).replace(/\r\n?/g, '\n');
   return looksLikeHtml(text) ? htmlToText(text) : text;
+}
+
+// Заголовок Битрикс собирает из начала текста поста и отдаёт с сущностями («&quot;»).
+// Раскодируем только сущности с «;», чтобы не испортить адреса с «&copy=…».
+function postTitle(raw: unknown): string {
+  return decodeHTMLStrict(str(raw)).replace(/\r\n?/g, '\n').replace(/\xA0/g, ' ');
 }
 
 export async function feedList(ctx: CommandContext, opts: { since?: string; until?: string; limit?: string; page?: string }): Promise<Envelope> {
@@ -65,7 +72,7 @@ export async function feedList(ctx: CommandContext, opts: { since?: string; unti
       id: num(p.ID),
       date: str(p.DATE_PUBLISH),
       author: { id: authorId, name: nameOf(names, authorId) },
-      title: str(p.TITLE),
+      title: postTitle(p.TITLE),
       text: cut.text,
       ...(cut.truncated ? { truncated: true } : {}),
       comments: num(p.NUM_COMMENTS) ?? 0,
@@ -99,7 +106,7 @@ export async function feedPost(ctx: CommandContext, idRaw: string, opts: { full?
     id,
     date: str(p.DATE_PUBLISH),
     author: { id: authorId, name: nameOf(names, authorId) },
-    title: str(p.TITLE),
+    title: postTitle(p.TITLE),
     text: cut.text,
     ...(cut.truncated ? { truncated: true } : {}),
     comments: comments.map((c) => {

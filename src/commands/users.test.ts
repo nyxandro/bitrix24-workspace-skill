@@ -12,6 +12,15 @@ describe('users', () => {
     expect(out.data).toEqual([{ id: 5, name: 'Иван Петров', position: 'Инженер', departmentIds: [3], active: true }]);
   });
 
+  it('get — номера, которых Битрикс не отдал, названы в пометке', async () => {
+    const { ctx } = fakeContext({ 'user.get': () => ({ json: { result: [IVAN] } }) });
+    const out = await usersGet(ctx, '5,402,999');
+    expect((out.data as unknown[]).length).toBe(1);
+    expect(out.notes.join(' ')).toContain('402, 999');
+    const all = fakeContext({ 'user.get': () => ({ json: { result: [IVAN] } }) });
+    expect((await usersGet(all.ctx, '5')).notes).toEqual([]);
+  });
+
   it('get принимает список id через запятую и не больше 50', async () => {
     const { ctx, calls } = fakeContext({ 'user.get': () => ({ json: { result: [IVAN] } }) });
     await usersGet(ctx, '5, 6');

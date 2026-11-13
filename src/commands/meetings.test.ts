@@ -30,6 +30,14 @@ describe('meetings', () => {
     expect(JSON.stringify(out)).not.toMatch(/token|relUrl/);
   });
 
+  it('время встречи приводится к зоне читателя: Битрикс отдаёт его в UTC', async () => {
+    const utc = { ...call(9, [1, 2]), startDate: '2026-10-02T15:31:18+00:00', endDate: '2026-10-02T15:32:38+00:00' };
+    const { ctx } = fakeContext({ 'call.followup.list': () => ({ json: { result: { items: [utc], hasMore: false } } }), 'call.followup.get': () => ({ json: { result: { item: utc } } }) });
+    const listed = ((await meetingsList(ctx, { from: '2026-10-01', to: '2026-10-03' })).data as M[])[0] as M;
+    expect(listed).toMatchObject({ start: '2026-10-02T18:31:18+03:00', end: '2026-10-02T18:32:38+03:00' });
+    expect((await meetingsGet(ctx, '9', {})).data).toMatchObject({ start: '2026-10-02T18:31:18+03:00', end: '2026-10-02T18:32:38+03:00' });
+  });
+
   it('участников больше 50 — показаны 50 и общее число', async () => {
     const { ctx } = fakeContext({ 'call.followup.list': () => ({ json: { result: { items: [call(9, Array.from({ length: 70 }, (_, i) => i + 1))], hasMore: false } } }) });
     const m = ((await meetingsList(ctx, { from: '2026-11-01', to: '2026-11-30' })).data as M[])[0] as M;

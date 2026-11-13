@@ -39,5 +39,7 @@ export async function usersGet(ctx: CommandContext, idsRaw: string): Promise<Env
     });
   }
   const resp = await ctx.client.call<unknown>('user.get', { filter: { ID: ids } });
-  return envelope(asArray(resp.result).filter(isObject).map(toUser));
+  const found = asArray(resp.result).filter(isObject).map(toUser);
+  const missing = ids.filter((id) => !found.some((user) => user.id === id));
+  return envelope(found, null, missing.length > 0 ? [`Битрикс24 не отдал сотрудников с номерами: ${missing.join(', ')} — таких нет, либо это внешние участники.`] : []);
 }

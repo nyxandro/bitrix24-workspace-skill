@@ -7,7 +7,7 @@
  */
 import { MAX_TEXT_CHARS } from '../config/config.js';
 import { parseInputDate } from '../render/dates.js';
-import { mailBodyToText } from '../render/html.js';
+import { mailBody, mailBodyToText } from '../render/html.js';
 import type { Envelope } from '../render/output.js';
 import { truncate } from '../render/text.js';
 import { asArray, type CommandContext, decodeCursor, encodeCursor, envelope, isObject, type Json, notFound, num, parseId, parseLimit, str } from './common.js';
@@ -74,13 +74,14 @@ export async function mailGet(ctx: CommandContext, idRaw: string, opts: { full?:
   const resp = await ctx.client.callV3<Json>('mail.message.get', { id: parseId(idRaw, 'id') });
   const item = isObject(resp.item) ? resp.item : null;
   if (!item || num(item.id) === null) throw notFound();
-  const text = mailBodyToText(str(item.body));
-  const cut = opts.full ? { text, truncated: false } : truncate(text, MAX_TEXT_CHARS);
-  return envelope(
-    { ...header(item), text: cut.text, ...(cut.truncated ? { truncated: true } : {}) },
-    null,
-    cut.truncated ? [`Текст обрезан на ${MAX_TEXT_CHARS} знаков, полностью — --full.`] : [],
-  );
+  const body = mailBody(str(item.body));
+  const cut = opts.full ? { text: body.text, truncated: false } : truncate(body.text, MAX_TEXT_CHARS);
+  const notes: string[] = [];
+  if (body.strippedStyleChars > 0) {
+    notes.push(`В начале письма убраны стили оформления (${body.strippedStyleChars} знаков) — это разметка, а не текст письма.`);
+  }
+  if (cut.truncated) notes.push(`Текст обрезан на ${MAX_TEXT_CHARS} знаков, полностью — --full.`);
+  return envelope({ ...header(item), text: cut.text, ...(cut.truncated ? { truncated: true } : {}) }, null, notes);
 }
 
 export async function mailThread(ctx: CommandContext, idRaw: string, opts: { limit?: string }): Promise<Envelope> {

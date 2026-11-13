@@ -24,7 +24,7 @@ export function registerChats(program: Command, run: Runner): void {
     .action(() => run((ctx) => chatsCounters(ctx)));
   chats
     .command('find')
-    .description('Найти чат по названию или участнику (чаты задач так не находятся — для них tasks get)')
+    .description('Найти чат по названию или участнику (чат проекта или коллабы — projects list --search, чат задачи — tasks get)')
     .argument('<текст>', 'не меньше 2 символов')
     .option('--limit <n>', 'сколько (по умолчанию 10, максимум 50)')
     .action((text: string, opts: { limit?: string }) => run((ctx) => chatsFind(ctx, text, opts.limit)));

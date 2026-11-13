@@ -188,6 +188,21 @@ describe('chats find, info, counters, search', () => {
     expect(((await chatsFind(ctx, 'номер')).data as { dialogId: string }[]).map((c) => c.dialogId)).toEqual(['chat7']);
   });
 
+  it('find — ничего не найдено: подсказка, где искать чаты проектов, коллаб и задач', async () => {
+    const { ctx } = fakeContext({ 'im.search.chat.list': () => ({ json: { result: [] } }) });
+    const note = (await chatsFind(ctx, 'DaoCode')).notes.join(' ');
+    expect(note).toContain('projects list --search');
+    expect(note).toContain('tasks get');
+  });
+
+  it('info — у лички нет названия: показываем имя собеседника', async () => {
+    const { ctx } = fakeContext({
+      'im.dialog.get': () => ({ json: { result: { id: 900, name: '', type: 'private', owner: 1, message_count: 5, last_message_id: 77 } } }),
+      'im.dialog.users.list': () => ({ json: { result: [{ id: 1, name: 'Я Сам', work_position: '' }, { id: 766, name: 'Баран Евгения', work_position: 'Руководитель' }], total: 2 } }),
+    });
+    expect((await chatsInfo(ctx, '766')).data).toMatchObject({ dialogId: '766', title: 'Баран Евгения', type: 'private' });
+  });
+
   it('info — участники до 50 и общее число', async () => {
     const members = Array.from({ length: 300 }, (_, i) => ({ id: i + 1, name: `Сотрудник ${i + 1}`, work_position: 'Инженер' }));
     const { ctx, calls } = fakeContext({

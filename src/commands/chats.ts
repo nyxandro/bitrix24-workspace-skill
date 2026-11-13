@@ -121,7 +121,8 @@ export async function chatsFind(ctx: CommandContext, text: string, limitRaw?: st
     .filter(isObject)
     .filter((c) => num(c.id) !== null)
     .map((c) => ({ dialogId: `chat${num(c.id)}`, title: str(c.name), type: str(c.type), entity: entityOf(c), messageCount: num(c.message_count) }));
-  const notes = data.length === 0 ? ['Чаты не найдены. Чаты задач так не ищутся — для них tasks get.'] : [];
+  // Чаты проектов и коллаб этот поиск не находит (проверено на портале) — у них свой путь.
+  const notes = data.length === 0 ? ['Чаты не найдены. Чат проекта или коллабы — через projects list --search, чат задачи — через tasks get.'] : [];
   return envelope(data, null, notes);
 }
 
@@ -138,10 +139,13 @@ export async function chatsInfo(ctx: CommandContext, dialogArg: string): Promise
     .map((u) => ({ id: num(u.id), name: personName(u), position: str(u.work_position) }));
   // user_counter и total списка участников у Битрикса расходятся (бот, внешние) — берём больший.
   const total = Math.max(num(d.result.user_counter) ?? 0, users.total ?? 0, members.length);
+  // У лички названия нет — называем её по собеседнику.
+  const peer = members.find((member) => member.id !== ctx.webhook.userId);
+  const title = str(d.result.name) || (str(d.result.type) === 'private' && peer ? peer.name : '');
   return envelope(
     {
       dialogId,
-      title: str(d.result.name),
+      title,
       type: str(d.result.type),
       ownerId: num(d.result.owner),
       entity: entityOf(d.result),

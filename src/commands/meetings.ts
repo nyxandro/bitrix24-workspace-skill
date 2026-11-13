@@ -7,7 +7,7 @@
  */
 import { AppError } from '../api/errors.js';
 import { MAX_MEMBERS, MAX_TEXT_CHARS } from '../config/config.js';
-import { parseInputDate } from '../render/dates.js';
+import { parseInputDate, toZone } from '../render/dates.js';
 import type { Envelope } from '../render/output.js';
 import { bbToText, truncate } from '../render/text.js';
 import { asArray, type CommandContext, decodeCursor, encodeCursor, envelope, isObject, type Json, num, parseId, parseLimit, str } from './common.js';
@@ -55,8 +55,8 @@ export async function meetingsList(ctx: CommandContext, opts: { from?: string; t
     .filter(isObject)
     .map((m) => ({
       callId: num(m.callId),
-      start: str(m.startDate),
-      end: str(m.endDate),
+      start: toZone(str(m.startDate), ctx.tz),
+      end: toZone(str(m.endDate), ctx.tz),
       durationSeconds: num(m.durationSeconds),
       topic: isObject(m.overview) ? str(m.overview.topic) : '',
       participants: allParticipants(m).slice(0, MAX_MEMBERS),
@@ -82,8 +82,8 @@ export async function meetingsGet(ctx: CommandContext, idRaw: string, opts: { tr
   const overview = isObject(item.overview) ? item.overview : {};
   const data: Json = {
     callId,
-    start: str(item.startDate),
-    end: str(item.endDate),
+    start: toZone(str(item.startDate), ctx.tz),
+    end: toZone(str(item.endDate), ctx.tz),
     durationSeconds: num(item.durationSeconds),
     participants: people.slice(0, MAX_MEMBERS),
     participantsTotal: people.length,

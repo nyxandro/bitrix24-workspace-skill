@@ -9,7 +9,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 export const APP_NAME = 'bitrix24-workspace-skill';
-export const APP_VERSION = '0.1.1';
+export const APP_VERSION = '0.1.2';
 export const CLI_NAME = 'b24';
 
 // Свой каталог и своя переменная: не пересекаемся с чужими скиллами «bitrix24»,

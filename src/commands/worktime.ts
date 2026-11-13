@@ -38,7 +38,20 @@ export async function worktimeRecords(ctx: CommandContext, opts: { from?: string
   });
   const records = asArray(resp.items)
     .filter(isObject)
-    .map((r) => ({ id: num(r.id), start: str(r.startTime), end: str(r.endTime) || null, durationSeconds: num(r.duration), breakSeconds: num(r.breakLength), state: str(r.state) }));
+    .map((r) => {
+      // Состояние приходит объектом { status, recommendedCloseTime }, статус — строчными
+      // буквами («closed»), а у timeman.status — заглавными (проверено на портале).
+      const state = isObject(r.state) ? str(r.state.status) : str(r.state);
+      return {
+        id: num(r.id),
+        start: str(r.startTime),
+        end: str(r.endTime) || null,
+        durationSeconds: num(r.duration),
+        breakSeconds: num(r.breakLength),
+        state: STATUS[state.toUpperCase()] ?? state,
+        approved: typeof r.isApproved === 'boolean' ? r.isApproved : null,
+      };
+    });
   const totalSeconds = records.reduce((sum, r) => sum + (r.durationSeconds ?? 0), 0);
   const notes = records.length === 0 ? ['Записей нет за этот период.'] : records.length >= limit ? [`Показаны ${limit} записей, и сумма — только по ним; увеличьте --limit или сузьте период.`] : [];
   return envelope({ records, totalSeconds }, null, notes);
