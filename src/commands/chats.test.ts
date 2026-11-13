@@ -112,6 +112,19 @@ describe('chats messages', () => {
     expect(JSON.stringify(out)).not.toMatch(/urlDownload|urlShow|viewerAttrs|token=/);
   });
 
+  it('--after — более новые сообщения по возрастанию, next для --after', async () => {
+    const { ctx, calls } = fakeContext({
+      'im.dialog.messages.get': (b) => ({
+        json: { result: { messages: Array.from({ length: Number(b.LIMIT) }, (_, i) => msg(Number(b.FIRST_ID) + i + 1)), users: USERS } },
+      }),
+    });
+    const out = await chatsMessages(ctx, 'chat987', { after: '100', limit: '60' });
+    expect(calls.map((c) => c.body.FIRST_ID)).toEqual([100, 150]);
+    expect((out.data as { id: number }[]).map((m) => m.id)).toEqual(Array.from({ length: 60 }, (_, i) => 101 + i));
+    expect(out.next).toBe('160');
+    await expect(chatsMessages(ctx, 'chat987', { after: '100', since: '2026-11-01' })).rejects.toMatchObject({ code: 'APP_CLI_INVALID_ARGUMENT' });
+  });
+
   it('403 — APP_B24_ACCESS_DENIED; неверный dialogId — APP_CLI_INVALID_ARGUMENT', async () => {
     const { ctx } = fakeContext({ 'im.dialog.get': () => ({ status: 403, json: { error: 'ACCESS_ERROR', error_description: 'x' } }) });
     await expect(chatsMessages(ctx, 'chat987', {})).rejects.toMatchObject({ code: 'APP_B24_ACCESS_DENIED' });
@@ -145,6 +158,13 @@ describe('chats recent', () => {
     expect(data[0]).toMatchObject({ unreadCount: 2, markedUnread: false, entity: { type: 'TASKS_TASK', id: '15' } });
     expect((data[0]?.lastMessage as M).text).toBe('привет');
     expect(decodeCursor(String(out.next), '--page', (v): v is { o: number } => typeof (v as { o?: unknown }).o === 'number')).toEqual({ o: 20 });
+  });
+
+  it('диалог неизвестного вида пропускается с пометкой, а не роняет весь список', async () => {
+    const { ctx } = fakeContext({ 'im.recent.list': () => ({ json: { result: { items: [item('chat10', 'chat', 0), { id: 'странный', title: 'x' }], hasMore: false } } }) });
+    const out = await chatsRecent(ctx, {});
+    expect((out.data as M[]).map((d) => d.dialogId)).toEqual(['chat10']);
+    expect(out.notes.join(' ')).toContain('Пропущено');
   });
 
   it('--type private пропускает групповые', async () => {

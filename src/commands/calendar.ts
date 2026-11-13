@@ -10,7 +10,8 @@ import { calendarDate, formatInZone, parseInputDate } from '../render/dates.js';
 import { htmlToText, looksLikeHtml } from '../render/html.js';
 import type { Envelope } from '../render/output.js';
 import { bbToText, truncate } from '../render/text.js';
-import { asArray, type CommandContext, envelope, isObject, type Json, lookupNames, nameOf, num, parseId, parseLimit, str } from './common.js';
+import { MAX_MEMBERS } from '../config/config.js';
+import { asArray, type CommandContext, envelope, isObject, type Json, lookupNames, nameOf, notFound, num, parseId, parseLimit, str } from './common.js';
 
 const RESPONSES: Readonly<Record<string, string>> = { Y: 'принял', N: 'отклонил', Q: 'не ответил', H: 'организатор' };
 
@@ -25,7 +26,7 @@ function isRecurring(rrule: unknown): boolean {
 function attendeeNames(ctx: CommandContext, events: Json[]): Promise<Map<number, string>> {
   return lookupNames(
     ctx,
-    events.flatMap((e) => asArray(e.ATTENDEE_LIST).filter(isObject).map((a) => num(a.id))).filter((id): id is number => id !== null),
+    events.flatMap((e) => asArray(e.ATTENDEE_LIST).filter(isObject).slice(0, MAX_MEMBERS).map((a) => num(a.id))).filter((id): id is number => id !== null),
   );
 }
 
@@ -40,8 +41,10 @@ function toEvent(e: Json, names: Map<number, string>) {
     recurring: isRecurring(e.RRULE),
     isMeeting: e.IS_MEETING === true || e.IS_MEETING === 'Y',
     myResponse: RESPONSES[str(e.MEETING_STATUS)] ?? null,
+    attendeesTotal: asArray(e.ATTENDEE_LIST).filter(isObject).length,
     attendees: asArray(e.ATTENDEE_LIST)
       .filter(isObject)
+      .slice(0, MAX_MEMBERS)
       .map((a) => {
         const id = num(a.id) ?? 0;
         return { id, name: nameOf(names, id), response: RESPONSES[str(a.status)] ?? str(a.status) };
@@ -85,7 +88,8 @@ export async function calendarEvents(ctx: CommandContext, opts: { from?: string;
 
 export async function calendarEvent(ctx: CommandContext, idRaw: string, opts: { full?: boolean }): Promise<Envelope> {
   const resp = await ctx.client.call<Json>('calendar.event.getbyid', { id: parseId(idRaw, 'id') });
-  const e = isObject(resp.result) ? resp.result : {};
+  const e = isObject(resp.result) ? resp.result : null;
+  if (!e || num(e.ID) === null) throw notFound();
   const names = await attendeeNames(ctx, [e]);
   const raw = bbToText(str(e.DESCRIPTION), new Map(), ctx.tz);
   const text = looksLikeHtml(raw) ? htmlToText(raw) : raw;

@@ -104,11 +104,12 @@ export async function diskSearch(
   const params: Json = { QUERY: query, TYPE: 'file', start };
   if (Object.keys(filter).length > 0) params.FILTER = filter;
   const resp = await ctx.client.call<unknown>('disk.file.search', params);
-  const data = asArray(resp.result)
-    .filter(isObject)
-    .slice(0, limit)
-    .map((f) => ({ ...entryOf(f), storageId: num(f.STORAGE_ID), folderId: num(f.PARENT_ID) }));
-  const next = typeof resp.next === 'number' ? encodeCursor({ s: resp.next }) : null;
+  const found = asArray(resp.result).filter(isObject);
+  const data = found.slice(0, limit).map((f) => ({ ...entryOf(f), storageId: num(f.STORAGE_ID), folderId: num(f.PARENT_ID) }));
+  // start у поиска — число пропущенных объектов (disk-file-search.md): продолжаем
+  // ровно с того, что не показали, иначе при --limit меньше 50 файлы пропадут.
+  const more = found.length > data.length || typeof resp.next === 'number';
+  const next = more && data.length > 0 ? encodeCursor({ s: start + data.length }) : null;
   const notes = data.length === 0 ? ['Ничего не найдено. Поиск не охватывает файлы чатов.'] : next ? ['Есть ещё: --page <next>.'] : [];
   return envelope(data, next, notes);
 }
@@ -132,12 +133,32 @@ export async function diskFile(ctx: CommandContext, idRaw: string): Promise<Enve
   return envelope(fileInfo(isObject(resp.result) ? resp.result : {}));
 }
 
-// Имя файла из портала → безопасное имя внутри папки: без путей и служебных символов.
+// Предел имени в байтах: файловые системы держат 255 байт, а к имени ещё добавятся
+// « (N)» и временный хвост «.part-…» — кириллица занимает по 2 байта на букву.
+const MAX_NAME_BYTES = 180;
+const MAX_EXT_BYTES = 20;
+
+function fitBytes(text: string, maxBytes: number): string {
+  let out = '';
+  for (const ch of text) {
+    if (Buffer.byteLength(out + ch) > maxBytes) break;
+    out += ch;
+  }
+  return out;
+}
+
+// Имя файла из портала → безопасное имя внутри папки: без путей и служебных символов,
+// не длиннее MAX_NAME_BYTES с сохранённым расширением.
 export function safeFileName(raw: string): string {
   const base = raw.split(/[\\/]/).pop() ?? '';
   // eslint-disable-next-line no-control-regex -- управляющие символы в имени файла убираем намеренно
   const cleaned = base.replace(/[\u0000-\u001f<>:"|?*]/g, '_').trim();
-  return cleaned === '' || cleaned === '.' || cleaned === '..' ? 'file' : cleaned;
+  if (cleaned === '' || cleaned === '.' || cleaned === '..') return 'file';
+  if (Buffer.byteLength(cleaned) <= MAX_NAME_BYTES) return cleaned;
+  const ext = path.extname(cleaned);
+  const keepExt = Buffer.byteLength(ext) <= MAX_EXT_BYTES ? ext : '';
+  const stem = keepExt ? cleaned.slice(0, -keepExt.length) : cleaned;
+  return `${fitBytes(stem, MAX_NAME_BYTES - Buffer.byteLength(keepExt)).trimEnd()}${keepExt}`;
 }
 
 function uniquePath(dir: string, name: string): string {

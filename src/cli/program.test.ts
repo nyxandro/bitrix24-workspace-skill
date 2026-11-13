@@ -14,6 +14,8 @@ describe('buildProgram', () => {
     [['nosuch'], 'APP_CLI_INVALID_ARGUMENT', 'Неизвестная команда «nosuch»'],
     [['users', 'find'], 'APP_CLI_INVALID_ARGUMENT', 'Не хватает аргумента'],
     [['status', '--wat'], 'APP_CLI_INVALID_ARGUMENT', 'Неизвестный параметр «--wat»'],
+    [[], 'APP_CLI_INVALID_ARGUMENT', 'Не указана команда'],
+    [['chats'], 'APP_CLI_INVALID_ARGUMENT', 'Не указана команда'],
   ])('ошибки разбора — по-русски с кодом: %j', async (argv, code, text) => {
     await expect(parseArgs(argv as string[])).rejects.toMatchObject({ code, userMessage: expect.stringContaining(text) });
   });

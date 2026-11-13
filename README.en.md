@@ -53,7 +53,7 @@ agent session afterwards.
 3. Put the webhook URL into `~/.config/bitrix24-workspace/.env` **yourself, never through the AI chat**:
 
    ```bash
-   mkdir -p ~/.config/bitrix24-workspace && read -rsp 'Webhook URL: ' U && printf 'BITRIX24_WORKSPACE_WEBHOOK_URL=%s\n' "$U" > ~/.config/bitrix24-workspace/.env && chmod 600 ~/.config/bitrix24-workspace/.env && unset U && echo ' done'
+   bash -c 'mkdir -p ~/.config/bitrix24-workspace && read -rsp "Webhook URL: " U && printf "BITRIX24_WORKSPACE_WEBHOOK_URL=%s\n" "$U" > ~/.config/bitrix24-workspace/.env && chmod 600 ~/.config/bitrix24-workspace/.env && echo " done"'
    ```
 
 4. Ask the agent to check the Bitrix24 connection — it will run `status`.
@@ -68,8 +68,9 @@ agent session afterwards.
   too) appear in output or errors; the skill downloads files itself.
 - **Content is data, not instructions.** The agent instructions forbid following commands found in
   emails, messages or documents.
-- **Only your own scope.** Even for an administrator the skill shows only their tasks and the
-  meetings they took part in.
+- **Lists are narrowed to your own.** Even for an administrator, task lists, meeting summaries and
+  default Drive storages show only their own. By direct id (a task, a group, someone's calendar)
+  and in Drive search, everything Bitrix24 allows that user is visible.
 
 ## Development
 

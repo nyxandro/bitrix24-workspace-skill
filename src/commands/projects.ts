@@ -25,7 +25,10 @@ const PAGE = 50;
 const MAX_PAGES = 10; // тип Битрикс не фильтрует — листаем, но не бесконечно
 const ROLE_NAMES: Readonly<Record<string, string>> = { A: 'владелец', E: 'модератор', K: 'участник', Z: 'запрос на вступление' };
 
-const isStartCursor = (v: unknown): v is { s: number } => isObject(v) && typeof v.s === 'number' && Number.isSafeInteger(v.s) && v.s >= 0;
+// start у списка групп — только кратный 50 (номер страницы); курсор помнит начало
+// страницы и сколько записей с неё уже просмотрено.
+const isPageCursor = (v: unknown): v is { s: number; k: number } =>
+  isObject(v) && Number.isSafeInteger(v.s) && Number.isSafeInteger(v.k) && (v.s as number) >= 0 && (v.k as number) >= 0;
 
 // Поле из ответа: разные методы раздела отдают то camelCase, то ВЕРХНИЙ_РЕГИСТР.
 function pick(obj: Json, camel: string, upper: string): unknown {
@@ -52,14 +55,16 @@ export async function projectsList(
     if (mine.size === 0) return envelope([], null, ['Вы не состоите ни в одной группе.']);
     filter.ID = [...mine];
   }
-  let start = opts.page ? decodeCursor(opts.page, '--page', isStartCursor).s : 0;
+  const cursor = opts.page ? decodeCursor(opts.page, '--page', isPageCursor) : { s: 0, k: 0 };
+  let start = cursor.s;
+  let skip = cursor.k;
   const collected: Json[] = [];
-  let nextStart: number | null = null;
+  let next: { s: number; k: number } | null = null;
   let stoppedByPages = false;
   for (let pages = 0; ; pages++) {
     if (pages >= MAX_PAGES) {
       stoppedByPages = true;
-      nextStart = start;
+      next = { s: start, k: 0 };
       break;
     }
     const resp = await ctx.client.call<Json>('socialnetwork.api.workgroup.list', {
@@ -69,18 +74,20 @@ export async function projectsList(
       start,
     });
     const groups = isObject(resp.result) ? asArray(resp.result.workgroups).filter(isObject) : [];
-    let i = 0;
+    let i = skip;
     for (; i < groups.length && collected.length < limit; i++) {
       const g = groups[i]!;
       if (!opts.type || str(pick(g, 'type', 'TYPE')) === opts.type) collected.push(g);
     }
     const morePages = typeof resp.next === 'number' && groups.length > 0;
     if (collected.length >= limit) {
-      nextStart = i < groups.length || morePages ? start + i : null;
+      if (i < groups.length) next = { s: start, k: i };
+      else if (morePages) next = { s: resp.next as number, k: 0 };
       break;
     }
     if (!morePages) break;
     start = resp.next as number;
+    skip = 0;
   }
   const data = collected.map((g) => {
     const id = num(pick(g, 'id', 'ID')) ?? 0;
@@ -96,8 +103,8 @@ export async function projectsList(
   const notes: string[] = [];
   if (data.length === 0) notes.push('Ничего не найдено.');
   if (stoppedByPages) notes.push(`Просмотрено ${MAX_PAGES * PAGE} групп; продолжить поиск — --page <next>.`);
-  else if (nextStart !== null) notes.push('Есть ещё: --page <next>.');
-  return envelope(data, nextStart !== null ? encodeCursor({ s: nextStart }) : null, notes);
+  else if (next !== null) notes.push('Есть ещё: --page <next>.');
+  return envelope(data, next !== null ? encodeCursor(next) : null, notes);
 }
 
 export async function projectsGet(ctx: CommandContext, idRaw: string): Promise<Envelope> {

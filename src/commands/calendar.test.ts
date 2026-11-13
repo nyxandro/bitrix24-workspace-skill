@@ -62,14 +62,32 @@ describe('calendar', () => {
   });
 
   it('имена участников подтягиваются порциями по 50', async () => {
-    const many = Array.from({ length: 51 }, (_, i) => ({ id: i + 1, status: 'Y' }));
+    const group = (from: number) => Array.from({ length: 40 }, (_, i) => ({ id: from + i, status: 'Y' }));
     const { ctx, calls } = fakeContext({
-      'calendar.event.get': () => ({ json: { result: [ev('1', '20.11.2026 10:00:00', { ATTENDEE_LIST: many })] } }),
+      'calendar.event.get': () => ({
+        json: { result: [ev('1', '20.11.2026 10:00:00', { ATTENDEE_LIST: group(1) }), ev('2', '21.11.2026 10:00:00', { ATTENDEE_LIST: group(41) })] },
+      }),
       'user.get': (b) => ({ json: { result: ((b.filter as M).ID as number[]).map((id) => ({ ID: String(id), NAME: `Имя${id}`, LAST_NAME: '' })) } }),
     });
     const data = (await calendarEvents(ctx, { from: '2026-11-19', to: '2026-11-30' })).data as M[];
-    expect(calls.filter((c) => c.method === 'user.get').map((c) => ((c.body.filter as M).ID as number[]).length)).toEqual([50, 1]);
-    expect((data[0]?.attendees as M[]).every((a) => !String(a.name).startsWith('сотрудник'))).toBe(true);
+    expect(calls.filter((c) => c.method === 'user.get').map((c) => ((c.body.filter as M).ID as number[]).length)).toEqual([50, 30]);
+    expect(data.flatMap((e) => e.attendees as M[]).every((a) => !String(a.name).startsWith('сотрудник'))).toBe(true);
+  });
+
+  it('event — нет события (result: null): APP_B24_NOT_FOUND', async () => {
+    const { ctx } = fakeContext({ 'calendar.event.getbyid': () => ({ json: { result: null } }) });
+    await expect(calendarEvent(ctx, '1', {})).rejects.toMatchObject({ code: 'APP_B24_NOT_FOUND' });
+  });
+
+  it('участников больше 50 — показаны 50 и общее число', async () => {
+    const many = Array.from({ length: 80 }, (_, i) => ({ id: i + 1, status: 'Y' }));
+    const { ctx } = fakeContext({
+      'calendar.event.get': () => ({ json: { result: [ev('1', '20.11.2026 10:00:00', { ATTENDEE_LIST: many })] } }),
+      'user.get': (b) => ({ json: { result: ((b.filter as M).ID as number[]).map((id) => ({ ID: String(id), NAME: `Имя${id}` })) } }),
+    });
+    const e = ((await calendarEvents(ctx, { from: '2026-11-19', to: '2026-11-30' })).data as M[])[0] as M;
+    expect((e.attendees as M[]).length).toBe(50);
+    expect(e.attendeesTotal).toBe(80);
   });
 
   it('event — с описанием', async () => {

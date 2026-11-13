@@ -24,10 +24,17 @@ describe('meetings', () => {
     await expect(meetingsList(ctx, { to: '2026-11-30' })).rejects.toMatchObject({ code: 'APP_CLI_INVALID_ARGUMENT' });
     const out = await meetingsList(ctx, { from: '2026-11-01', to: '2026-11-30' });
     expect(calls[0]?.body).toMatchObject({ filter: { participantId: 1, startDate: { from: '2026-11-01T00:00:00+03:00', to: '2026-11-30T23:59:59+03:00' } }, pagination: { limit: 20 } });
-    expect((out.data as M[])[0]).toEqual({ callId: 9, start: '2026-11-10T10:00:00+03:00', end: '2026-11-10T11:00:00+03:00', durationSeconds: 3600, topic: 'Планёрка', participants: [{ id: 1, name: 'Сотрудник 1' }, { id: 2, name: 'Сотрудник 2' }] });
+    expect((out.data as M[])[0]).toEqual({ callId: 9, start: '2026-11-10T10:00:00+03:00', end: '2026-11-10T11:00:00+03:00', durationSeconds: 3600, topic: 'Планёрка', participants: [{ id: 1, name: 'Сотрудник 1' }, { id: 2, name: 'Сотрудник 2' }], participantsTotal: 2 });
     await meetingsList(ctx, { from: '2026-11-01', to: '2026-11-30', page: String(out.next) });
     expect(calls[1]?.body).toMatchObject({ pagination: { afterCursor: { startDate: 'x', callId: 9 } } });
     expect(JSON.stringify(out)).not.toMatch(/token|relUrl/);
+  });
+
+  it('участников больше 50 — показаны 50 и общее число', async () => {
+    const { ctx } = fakeContext({ 'call.followup.list': () => ({ json: { result: { items: [call(9, Array.from({ length: 70 }, (_, i) => i + 1))], hasMore: false } } }) });
+    const m = ((await meetingsList(ctx, { from: '2026-11-01', to: '2026-11-30' })).data as M[])[0] as M;
+    expect((m.participants as M[]).length).toBe(50);
+    expect(m.participantsTotal).toBe(70);
   });
 
   it('get — итог без расшифровки; с --transcript — с ней; чужая встреча — отказ без данных', async () => {

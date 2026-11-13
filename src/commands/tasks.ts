@@ -20,6 +20,7 @@ import {
   num,
   parseId,
   parseLimit,
+  notFound,
   str,
 } from './common.js';
 
@@ -52,7 +53,10 @@ const GET_SELECT = [
 const PAGE = 50;
 const IM_DIALOG_RE = /IM_DIALOG=(chat\d+|\d+)/g;
 
-const isStartCursor = (v: unknown): v is { s: number } => isObject(v) && typeof v.s === 'number' && Number.isSafeInteger(v.s) && v.s >= 0;
+// Страница Битрикса — всегда 50 задач; курсор помнит её начало и сколько уже показано,
+// чтобы при --limit меньше 50 ничего не пропадало.
+const isPageCursor = (v: unknown): v is { s: number; k: number } =>
+  isObject(v) && Number.isSafeInteger(v.s) && Number.isSafeInteger(v.k) && (v.s as number) >= 0 && (v.k as number) >= 0;
 
 function invalid(message: string): AppError {
   return new AppError({ code: 'APP_CLI_INVALID_ARGUMENT', userMessage: message });
@@ -102,22 +106,32 @@ export async function tasksList(
   if (status === 'done') base.REAL_STATUS = 5;
   if (opts.project) base.GROUP_ID = parseId(opts.project, '--project');
   if (opts.search?.trim()) base['%TITLE'] = opts.search.trim();
-  const start = opts.page ? decodeCursor(opts.page, '--page', isStartCursor).s : 0;
-
-  const roles = role === 'any' ? Object.keys(ROLE_FIELDS) : [role];
-  const merged = new Map<number, { task: Json; roles: string[] }>();
-  let next: number | undefined;
-  let anyFull = false;
-  for (const r of roles) {
-    const resp = await ctx.client.call<Json>('tasks.task.list', {
+  const cursor = opts.page ? decodeCursor(opts.page, '--page', isPageCursor) : { s: 0, k: 0 };
+  const request = (r: string) =>
+    ctx.client.call<Json>('tasks.task.list', {
       filter: { [ROLE_FIELDS[r]!]: ctx.webhook.userId, ...base },
       select: LIST_SELECT,
       order: { CHANGED_DATE: 'desc' },
-      start,
+      start: cursor.s,
     });
-    const tasks = isObject(resp.result) ? asArray(resp.result.tasks).filter(isObject) : [];
+  const tasksOf = (resp: { result: Json }) => (isObject(resp.result) ? asArray(resp.result.tasks).filter(isObject) : []);
+
+  if (role !== 'any') {
+    const resp = await request(role);
+    const page = tasksOf(resp);
+    const shown = page.slice(cursor.k, cursor.k + limit).map((t) => summary(t, [role]));
+    let next: { s: number; k: number } | null = null;
+    if (cursor.k + limit < page.length) next = { s: cursor.s, k: cursor.k + limit };
+    else if (typeof resp.next === 'number') next = { s: resp.next, k: 0 };
+    const notes = shown.length === 0 ? ['Задач не найдено.'] : next ? ['Есть ещё задачи: --page <next>.'] : [];
+    return envelope(shown, next ? encodeCursor(next) : null, notes);
+  }
+
+  const merged = new Map<number, { task: Json; roles: string[] }>();
+  let anyFull = false;
+  for (const r of Object.keys(ROLE_FIELDS)) {
+    const tasks = tasksOf(await request(r));
     anyFull ||= tasks.length >= PAGE;
-    next = resp.next;
     for (const t of tasks) {
       const id = num(t.id);
       if (id === null) continue;
@@ -132,20 +146,17 @@ export async function tasksList(
     .map((e) => summary(e.task, e.roles));
   const notes: string[] = [];
   if (sorted.length === 0) notes.push('Задач не найдено.');
-  let cursor: string | null = null;
-  if (role !== 'any' && typeof next === 'number') {
-    cursor = encodeCursor({ s: next });
-    notes.push('Есть ещё задачи: --page <next>.');
-  } else if (role === 'any' && (anyFull || merged.size > limit)) {
+  if (anyFull || merged.size > limit) {
     notes.push('Показаны последние изменённые задачи по всем вашим ролям; полный список — с --role и --page.');
   }
-  return envelope(sorted, cursor, notes);
+  return envelope(sorted, null, notes);
 }
 
 export async function tasksGet(ctx: CommandContext, idRaw: string, opts: { full?: boolean }): Promise<Envelope> {
   const id = parseId(idRaw, 'id');
   const resp = await ctx.client.call<Json>('tasks.task.get', { taskId: id, select: GET_SELECT });
-  const t = isObject(resp.result) && isObject(resp.result.task) ? resp.result.task : {};
+  const t = isObject(resp.result) && isObject(resp.result.task) ? resp.result.task : null;
+  if (!t || num(t.id) === null) throw notFound();
   const rawDescription = str(t.description);
   const text = bbToText(rawDescription, new Map(), ctx.tz);
   const description = opts.full ? { text, truncated: false } : truncate(text, MAX_TEXT_CHARS);

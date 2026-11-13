@@ -40,7 +40,8 @@ export function buildProgram(run: Runner = runCommand): Command {
   return program;
 }
 
-const HELP_CODES = new Set(['commander.helpDisplayed', 'commander.help', 'commander.version']);
+// commander.help — справка, показанная сама (команда не указана): для агента это ошибка вызова.
+const HELP_CODES = new Set(['commander.helpDisplayed', 'commander.version']);
 
 function translate(err: CommanderError): AppError {
   const token = /'([^']+)'/.exec(err.message)?.[1] ?? '';
@@ -51,6 +52,7 @@ function translate(err: CommanderError): AppError {
     'commander.optionMissingArgument': `У параметра «${token}» не указано значение.`,
     'commander.missingMandatoryOptionValue': `Не указан обязательный параметр «${token}».`,
     'commander.excessArguments': 'Лишние аргументы у команды. Справка по команде: b24 <команда> --help.',
+    'commander.help': 'Не указана команда. Список разделов: b24 --help; команды раздела: b24 <раздел> --help.',
   };
   return new AppError({
     code: 'APP_CLI_INVALID_ARGUMENT',

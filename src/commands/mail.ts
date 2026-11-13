@@ -10,10 +10,12 @@ import { parseInputDate } from '../render/dates.js';
 import { mailBodyToText } from '../render/html.js';
 import type { Envelope } from '../render/output.js';
 import { truncate } from '../render/text.js';
-import { asArray, type CommandContext, decodeCursor, encodeCursor, envelope, isObject, type Json, num, parseId, parseLimit, str } from './common.js';
+import { asArray, type CommandContext, decodeCursor, encodeCursor, envelope, isObject, type Json, notFound, num, parseId, parseLimit, str } from './common.js';
 
 const PREVIEW_CHARS = 300;
-const isPageCursor = (v: unknown): v is { p: number } => isObject(v) && typeof v.p === 'number' && Number.isSafeInteger(v.p) && v.p >= 1;
+// Курсор помнит и размер страницы: страница N при другом --limit указывала бы на другие письма.
+const isPageCursor = (v: unknown): v is { p: number; l: number } =>
+  isObject(v) && Number.isSafeInteger(v.p) && (v.p as number) >= 1 && Number.isSafeInteger(v.l) && (v.l as number) >= 1;
 
 function mailDate(raw: unknown): string {
   const value = str(raw);
@@ -48,8 +50,9 @@ export async function mailList(
   ctx: CommandContext,
   opts: { box?: string; search?: string; since?: string; until?: string; unread?: boolean; folder?: string; withAttachments?: boolean; limit?: string; page?: string },
 ): Promise<Envelope> {
-  const limit = parseLimit(opts.limit, 20, 50);
-  const page = opts.page ? decodeCursor(opts.page, '--page', isPageCursor).p : 1;
+  const cursor = opts.page ? decodeCursor(opts.page, '--page', isPageCursor) : null;
+  const limit = cursor ? cursor.l : parseLimit(opts.limit, 20, 50);
+  const page = cursor ? cursor.p : 1;
   const params: Json = {};
   if (opts.box) params.mailboxId = parseId(opts.box, '--box');
   if (opts.search?.trim()) params.searchQuery = opts.search.trim();
@@ -61,14 +64,15 @@ export async function mailList(
   params.pagination = { limit, page };
   const resp = await ctx.client.callV3<Json>('mail.message.list', params);
   const items = asArray(resp.items).filter(isObject);
-  const next = items.length >= limit ? encodeCursor({ p: page + 1 }) : null;
+  const next = items.length >= limit ? encodeCursor({ p: page + 1, l: limit }) : null;
   const notes = items.length === 0 ? ['Писем не найдено.'] : next ? ['Есть ещё письма: --page <next>.'] : [];
   return envelope(items.map(header), next, notes);
 }
 
 export async function mailGet(ctx: CommandContext, idRaw: string, opts: { full?: boolean }): Promise<Envelope> {
   const resp = await ctx.client.callV3<Json>('mail.message.get', { id: parseId(idRaw, 'id') });
-  const item = isObject(resp.item) ? resp.item : resp;
+  const item = isObject(resp.item) ? resp.item : null;
+  if (!item || num(item.id) === null) throw notFound();
   const text = mailBodyToText(str(item.body));
   const cut = opts.full ? { text, truncated: false } : truncate(text, MAX_TEXT_CHARS);
   return envelope(

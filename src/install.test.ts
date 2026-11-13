@@ -48,6 +48,18 @@ describe('install.sh', () => {
     expect(fs.lstatSync(path.join(home, '.claude/skills/bitrix24-workspace')).isSymbolicLink()).toBe(true);
   });
 
+  it('~/.claude/skills — ссылка на ~/.agents/skills: скилл не ломается и не ссылается сам на себя', () => {
+    const home = tmp('b24-home-');
+    fs.mkdirSync(path.join(home, '.agents/skills'), { recursive: true });
+    fs.mkdirSync(path.join(home, '.claude'), { recursive: true });
+    fs.symlinkSync('../.agents/skills', path.join(home, '.claude/skills'));
+    install(home, ['--file', fakeArchive(tmp('b24-arc-'))]);
+    const installed = path.join(home, '.agents/skills/bitrix24-workspace');
+    expect(fs.lstatSync(installed).isDirectory()).toBe(true);
+    expect(fs.existsSync(path.join(installed, 'SKILL.md'))).toBe(true);
+    expect(fs.existsSync(path.join(home, '.claude/skills/bitrix24-workspace/SKILL.md'))).toBe(true);
+  });
+
   it('не архив скилла — понятная ошибка', () => {
     const home = tmp('b24-home-');
     const bad = path.join(tmp('b24-arc-'), 'bad.skill');

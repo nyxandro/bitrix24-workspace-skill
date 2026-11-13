@@ -61,8 +61,19 @@ export async function chatsRecent(
   }
   const seen = new Set<string>();
   const data = [];
+  let skipped = 0;
   for (const it of asArray(resp.result.items).filter(isObject)) {
-    const dialogId = normalizeDialogId(str(it.id), str(it.type));
+    let dialogId: string;
+    try {
+      dialogId = normalizeDialogId(str(it.id), str(it.type) || undefined);
+    } catch (err) {
+      // Один диалог незнакомого вида не должен прятать весь список — пропускаем и говорим об этом.
+      if (err instanceof AppError && err.code === 'APP_B24_UNEXPECTED_RESPONSE') {
+        skipped += 1;
+        continue;
+      }
+      throw err;
+    }
     const unreadCount = num(it.counter) ?? 0;
     // Страницы пересекаются (im-recent-list.md); непрочитанное — по counter, а unread — ручная пометка.
     if (seen.has(dialogId) || (opts.unread && unreadCount === 0)) {
@@ -85,6 +96,7 @@ export async function chatsRecent(
   }
   const hasMore = resp.result.hasMore === true || resp.result.hasMorePages === true;
   const notes = data.length === 0 ? ['Ничего не найдено на этой странице.'] : [];
+  if (skipped > 0) notes.push(`Пропущено диалогов незнакомого вида: ${skipped}.`);
   if (hasMore) notes.push('Есть ещё диалоги: --page <next>.');
   return envelope(data, hasMore ? encodeCursor({ o: offset + limit }) : null, notes);
 }
@@ -176,6 +188,9 @@ export async function chatsMessages(ctx: CommandContext, dialogArg: string, opts
   const limit = parseLimit(opts.limit, 30, 200);
   if (opts.before && opts.after) {
     throw invalid('Параметры --before и --after вместе не используются: выберите одно направление.');
+  }
+  if (opts.after && opts.since) {
+    throw invalid('Параметры --after и --since вместе не используются: --since листает назад до даты.');
   }
   const full = opts.full === true;
   if (opts.after) {

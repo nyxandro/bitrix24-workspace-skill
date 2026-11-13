@@ -22,6 +22,8 @@ export const SECTION_SCOPES: Readonly<Record<string, readonly string[]>> = {
   worktime: ['timeman'],
   users: ['user_basic'],
 };
+// Для раздела «сотрудники» годится любое из прав user*, но user (с приглашением и правкой
+// профилей) шире нужного — его помечаем лишним.
 const USER_SCOPES = ['user', 'user_basic', 'user_brief'];
 
 export async function status(ctx: CommandContext, check: () => Promise<UpdateInfo> = () => checkForUpdate()): Promise<Envelope> {
@@ -37,7 +39,7 @@ export async function status(ctx: CommandContext, check: () => Promise<UpdateInf
     );
     sections[section] = lacking.length === 0 ? 'ok' : `нет права ${lacking.join(', ')}`;
   }
-  const needed = new Set([...Object.values(SECTION_SCOPES).flat(), ...USER_SCOPES, 'basic']);
+  const needed = new Set([...Object.values(SECTION_SCOPES).flat(), 'user_brief', 'basic']);
   const extra = granted.filter((s) => !needed.has(s));
 
   const notes: string[] = [];

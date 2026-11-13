@@ -50,6 +50,24 @@ describe('tasks list', () => {
   });
 });
 
+describe('tasks list: листание при --limit меньше страницы Битрикса', () => {
+  it('одна роль, --limit 20: страницы 1–20, 21–40, 41–50, потом следующая страница Битрикса', async () => {
+    const page = (start: number) => Array.from({ length: 50 }, (_, i) => task(start + i + 1, '2026-11-10T10:00:00+03:00'));
+    const { ctx, calls } = fakeContext({
+      'tasks.task.list': (b) => ({ json: { result: { tasks: page(Number(b.start)) }, next: Number(b.start) + 50 } }),
+    });
+    const seen: number[] = [];
+    let next: string | null = null;
+    for (let i = 0; i < 4; i++) {
+      const out = await tasksList(ctx, { role: 'responsible', limit: '20', ...(next ? { page: next } : {}) });
+      seen.push(...(out.data as M[]).map((t) => t.id as number));
+      next = out.next;
+    }
+    expect(seen).toEqual(Array.from({ length: 70 }, (_, i) => i + 1));
+    expect(calls.map((c) => c.body.start)).toEqual([0, 0, 0, 50]);
+  });
+});
+
 describe('tasks get', () => {
   it('карточка, dialogId чата, чаты из описания, чек-лист', async () => {
     const { ctx } = fakeContext({

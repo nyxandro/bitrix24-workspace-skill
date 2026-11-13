@@ -129,3 +129,7 @@ export async function lookupNames(ctx: CommandContext, ids: Iterable<number>): P
 export function nameOf(names: Map<number, string>, id: number): string {
   return names.get(id) ?? `сотрудник ${id}`;
 }
+
+export function notFound(): AppError {
+  return new AppError({ code: 'APP_B24_NOT_FOUND', userMessage: 'Не найдено: такого объекта нет или он удалён. Проверьте номер.' });
+}

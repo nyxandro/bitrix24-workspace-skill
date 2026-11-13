@@ -6,7 +6,7 @@
  * владелец вебхука участник. Ссылки на записи (tracks, url) не выводятся.
  */
 import { AppError } from '../api/errors.js';
-import { MAX_TEXT_CHARS } from '../config/config.js';
+import { MAX_MEMBERS, MAX_TEXT_CHARS } from '../config/config.js';
 import { parseInputDate } from '../render/dates.js';
 import type { Envelope } from '../render/output.js';
 import { bbToText, truncate } from '../render/text.js';
@@ -18,7 +18,7 @@ const URL_KEY_RE = /url/i;
 
 const isCursor = (v: unknown): v is Json => isObject(v);
 
-function participants(item: Json) {
+function allParticipants(item: Json) {
   return asArray(item.participants)
     .filter(isObject)
     .map((p) => ({ id: num(p.userId) ?? 0, name: str(p.name) }));
@@ -59,7 +59,8 @@ export async function meetingsList(ctx: CommandContext, opts: { from?: string; t
       end: str(m.endDate),
       durationSeconds: num(m.durationSeconds),
       topic: isObject(m.overview) ? str(m.overview.topic) : '',
-      participants: participants(m),
+      participants: allParticipants(m).slice(0, MAX_MEMBERS),
+      participantsTotal: allParticipants(m).length,
     }));
   const next = resp.hasMore === true && isObject(resp.afterCursor) ? encodeCursor(resp.afterCursor) : null;
   const notes = data.length === 0 ? ['Итогов встреч за этот период нет.'] : next ? ['Есть ещё: --page <next>.'] : [];
@@ -71,7 +72,7 @@ export async function meetingsGet(ctx: CommandContext, idRaw: string, opts: { tr
   const select = ['callId', 'startDate', 'endDate', 'durationSeconds', 'participants', 'overview', 'summary', ...(opts.transcript ? ['transcription'] : [])];
   const resp = await ctx.client.callV3<Json>('call.followup.get', { callId, select });
   const item = isObject(resp.item) ? resp.item : resp;
-  const people = participants(item);
+  const people = allParticipants(item);
   if (!people.some((p) => p.id === ctx.webhook.userId)) {
     throw new AppError({
       code: 'APP_B24_ACCESS_DENIED',
@@ -84,7 +85,8 @@ export async function meetingsGet(ctx: CommandContext, idRaw: string, opts: { tr
     start: str(item.startDate),
     end: str(item.endDate),
     durationSeconds: num(item.durationSeconds),
-    participants: people,
+    participants: people.slice(0, MAX_MEMBERS),
+    participantsTotal: people.length,
     topic: str(overview.topic),
     meetingType: clean(overview.meetingType, ctx.tz),
     agenda: clean(overview.agenda, ctx.tz),

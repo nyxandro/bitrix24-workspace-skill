@@ -10351,7 +10351,7 @@ function mapBitrixError(input) {
   const details = { bitrixCode: input.code, status: input.status, method: input.method, description: input.description };
   const make = (code, userMessage) => new AppError({ code, userMessage, details });
   const accessDenied = () => make("APP_B24_ACCESS_DENIED", "\u041D\u0435\u0442 \u0434\u043E\u0441\u0442\u0443\u043F\u0430: \u0432\u044B \u043D\u0435 \u0443\u0447\u0430\u0441\u0442\u043D\u0438\u043A \u044D\u0442\u043E\u0433\u043E \u0447\u0430\u0442\u0430 \u0438\u043B\u0438 \u0443 \u0432\u0430\u0441 \u043D\u0435\u0442 \u043F\u0440\u0430\u0432 \u043D\u0430 \u044D\u0442\u043E\u0442 \u043E\u0431\u044A\u0435\u043A\u0442 \u0432 \u0411\u0438\u0442\u0440\u0438\u043A\u044124.");
-  const notFound = () => make("APP_B24_NOT_FOUND", "\u041D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u043E: \u0442\u0430\u043A\u043E\u0433\u043E \u043E\u0431\u044A\u0435\u043A\u0442\u0430 \u043D\u0435\u0442 \u0438\u043B\u0438 \u043E\u043D \u0443\u0434\u0430\u043B\u0451\u043D. \u041F\u0440\u043E\u0432\u0435\u0440\u044C\u0442\u0435 \u043D\u043E\u043C\u0435\u0440.");
+  const notFound2 = () => make("APP_B24_NOT_FOUND", "\u041D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u043E: \u0442\u0430\u043A\u043E\u0433\u043E \u043E\u0431\u044A\u0435\u043A\u0442\u0430 \u043D\u0435\u0442 \u0438\u043B\u0438 \u043E\u043D \u0443\u0434\u0430\u043B\u0451\u043D. \u041F\u0440\u043E\u0432\u0435\u0440\u044C\u0442\u0435 \u043D\u043E\u043C\u0435\u0440.");
   const badRequest = () => {
     const fields = input.fields && input.fields.length > 0 ? `: ${input.fields.join(", ")}` : "";
     return make("APP_B24_BAD_REQUEST", `\u0411\u0438\u0442\u0440\u0438\u043A\u044124 \u043E\u0442\u043A\u043B\u043E\u043D\u0438\u043B \u043F\u0430\u0440\u0430\u043C\u0435\u0442\u0440\u044B \u0437\u0430\u043F\u0440\u043E\u0441\u0430${fields}. \u0418\u0441\u043F\u0440\u0430\u0432\u044C\u0442\u0435 \u043F\u0430\u0440\u0430\u043C\u0435\u0442\u0440\u044B \u043A\u043E\u043C\u0430\u043D\u0434\u044B.`);
@@ -10398,13 +10398,13 @@ function mapBitrixError(input) {
     return accessDenied();
   }
   if (upper.includes("NOT_FOUND") || upper.includes("NOTFOUND")) {
-    return notFound();
+    return notFound2();
   }
   if (isBadRequestCode(upper)) {
     return badRequest();
   }
   if (/not\s*found|не\s*найден/i.test(description)) {
-    return notFound();
+    return notFound2();
   }
   if (/access\s*denied|нет\s*доступа|доступ\s*запрещ/i.test(description)) {
     return accessDenied();
@@ -10413,7 +10413,7 @@ function mapBitrixError(input) {
     return accessDenied();
   }
   if (input.status === 404) {
-    return notFound();
+    return notFound2();
   }
   if (input.status === 400) {
     return badRequest();
@@ -10993,6 +10993,9 @@ async function lookupNames(ctx, ids) {
 function nameOf(names, id) {
   return names.get(id) ?? `\u0441\u043E\u0442\u0440\u0443\u0434\u043D\u0438\u043A ${id}`;
 }
+function notFound() {
+  return new AppError({ code: "APP_B24_NOT_FOUND", userMessage: "\u041D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u043E: \u0442\u0430\u043A\u043E\u0433\u043E \u043E\u0431\u044A\u0435\u043A\u0442\u0430 \u043D\u0435\u0442 \u0438\u043B\u0438 \u043E\u043D \u0443\u0434\u0430\u043B\u0451\u043D. \u041F\u0440\u043E\u0432\u0435\u0440\u044C\u0442\u0435 \u043D\u043E\u043C\u0435\u0440." });
+}
 
 // src/commands/calendar.ts
 var RESPONSES = { Y: "\u043F\u0440\u0438\u043D\u044F\u043B", N: "\u043E\u0442\u043A\u043B\u043E\u043D\u0438\u043B", Q: "\u043D\u0435 \u043E\u0442\u0432\u0435\u0442\u0438\u043B", H: "\u043E\u0440\u0433\u0430\u043D\u0438\u0437\u0430\u0442\u043E\u0440" };
@@ -11005,7 +11008,7 @@ function isRecurring(rrule) {
 function attendeeNames(ctx, events) {
   return lookupNames(
     ctx,
-    events.flatMap((e) => asArray(e.ATTENDEE_LIST).filter(isObject2).map((a) => num(a.id))).filter((id) => id !== null)
+    events.flatMap((e) => asArray(e.ATTENDEE_LIST).filter(isObject2).slice(0, MAX_MEMBERS).map((a) => num(a.id))).filter((id) => id !== null)
   );
 }
 function toEvent(e, names) {
@@ -11019,7 +11022,8 @@ function toEvent(e, names) {
     recurring: isRecurring(e.RRULE),
     isMeeting: e.IS_MEETING === true || e.IS_MEETING === "Y",
     myResponse: RESPONSES[str(e.MEETING_STATUS)] ?? null,
-    attendees: asArray(e.ATTENDEE_LIST).filter(isObject2).map((a) => {
+    attendeesTotal: asArray(e.ATTENDEE_LIST).filter(isObject2).length,
+    attendees: asArray(e.ATTENDEE_LIST).filter(isObject2).slice(0, MAX_MEMBERS).map((a) => {
       const id = num(a.id) ?? 0;
       return { id, name: nameOf(names, id), response: RESPONSES[str(a.status)] ?? str(a.status) };
     })
@@ -11057,7 +11061,8 @@ async function calendarEvents(ctx, opts) {
 }
 async function calendarEvent(ctx, idRaw, opts) {
   const resp = await ctx.client.call("calendar.event.getbyid", { id: parseId(idRaw, "id") });
-  const e = isObject2(resp.result) ? resp.result : {};
+  const e = isObject2(resp.result) ? resp.result : null;
+  if (!e || num(e.ID) === null) throw notFound();
   const names = await attendeeNames(ctx, [e]);
   const raw = bbToText(str(e.DESCRIPTION), /* @__PURE__ */ new Map(), ctx.tz);
   const text = looksLikeHtml(raw) ? htmlToText(raw) : raw;
@@ -11070,7 +11075,7 @@ var MAX_PAGE = 20;
 var TRANSCRIPT_CHARS = 4e4;
 var URL_KEY_RE = /url/i;
 var isCursor = (v) => isObject2(v);
-function participants(item) {
+function allParticipants(item) {
   return asArray(item.participants).filter(isObject2).map((p) => ({ id: num(p.userId) ?? 0, name: str(p.name) }));
 }
 function clean(value, tz) {
@@ -11103,7 +11108,8 @@ async function meetingsList(ctx, opts) {
     end: str(m.endDate),
     durationSeconds: num(m.durationSeconds),
     topic: isObject2(m.overview) ? str(m.overview.topic) : "",
-    participants: participants(m)
+    participants: allParticipants(m).slice(0, MAX_MEMBERS),
+    participantsTotal: allParticipants(m).length
   }));
   const next = resp.hasMore === true && isObject2(resp.afterCursor) ? encodeCursor(resp.afterCursor) : null;
   const notes = data.length === 0 ? ["\u0418\u0442\u043E\u0433\u043E\u0432 \u0432\u0441\u0442\u0440\u0435\u0447 \u0437\u0430 \u044D\u0442\u043E\u0442 \u043F\u0435\u0440\u0438\u043E\u0434 \u043D\u0435\u0442."] : next ? ["\u0415\u0441\u0442\u044C \u0435\u0449\u0451: --page <next>."] : [];
@@ -11114,7 +11120,7 @@ async function meetingsGet(ctx, idRaw, opts) {
   const select = ["callId", "startDate", "endDate", "durationSeconds", "participants", "overview", "summary", ...opts.transcript ? ["transcription"] : []];
   const resp = await ctx.client.callV3("call.followup.get", { callId, select });
   const item = isObject2(resp.item) ? resp.item : resp;
-  const people2 = participants(item);
+  const people2 = allParticipants(item);
   if (!people2.some((p) => p.id === ctx.webhook.userId)) {
     throw new AppError({
       code: "APP_B24_ACCESS_DENIED",
@@ -11127,7 +11133,8 @@ async function meetingsGet(ctx, idRaw, opts) {
     start: str(item.startDate),
     end: str(item.endDate),
     durationSeconds: num(item.durationSeconds),
-    participants: people2,
+    participants: people2.slice(0, MAX_MEMBERS),
+    participantsTotal: people2.length,
     topic: str(overview.topic),
     meetingType: clean(overview.meetingType, ctx.tz),
     agenda: clean(overview.agenda, ctx.tz),
@@ -11264,8 +11271,18 @@ async function chatsRecent(ctx, opts) {
   }
   const seen = /* @__PURE__ */ new Set();
   const data = [];
+  let skipped = 0;
   for (const it of asArray(resp.result.items).filter(isObject2)) {
-    const dialogId = normalizeDialogId(str(it.id), str(it.type));
+    let dialogId;
+    try {
+      dialogId = normalizeDialogId(str(it.id), str(it.type) || void 0);
+    } catch (err) {
+      if (err instanceof AppError && err.code === "APP_B24_UNEXPECTED_RESPONSE") {
+        skipped += 1;
+        continue;
+      }
+      throw err;
+    }
     const unreadCount = num(it.counter) ?? 0;
     if (seen.has(dialogId) || opts.unread && unreadCount === 0) {
       continue;
@@ -11285,6 +11302,7 @@ async function chatsRecent(ctx, opts) {
   }
   const hasMore = resp.result.hasMore === true || resp.result.hasMorePages === true;
   const notes = data.length === 0 ? ["\u041D\u0438\u0447\u0435\u0433\u043E \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u043E \u043D\u0430 \u044D\u0442\u043E\u0439 \u0441\u0442\u0440\u0430\u043D\u0438\u0446\u0435."] : [];
+  if (skipped > 0) notes.push(`\u041F\u0440\u043E\u043F\u0443\u0449\u0435\u043D\u043E \u0434\u0438\u0430\u043B\u043E\u0433\u043E\u0432 \u043D\u0435\u0437\u043D\u0430\u043A\u043E\u043C\u043E\u0433\u043E \u0432\u0438\u0434\u0430: ${skipped}.`);
   if (hasMore) notes.push("\u0415\u0441\u0442\u044C \u0435\u0449\u0451 \u0434\u0438\u0430\u043B\u043E\u0433\u0438: --page <next>.");
   return envelope(data, hasMore ? encodeCursor({ o: offset + limit }) : null, notes);
 }
@@ -11357,6 +11375,9 @@ async function chatsMessages(ctx, dialogArg, opts) {
   const limit = parseLimit(opts.limit, 30, 200);
   if (opts.before && opts.after) {
     throw invalid3("\u041F\u0430\u0440\u0430\u043C\u0435\u0442\u0440\u044B --before \u0438 --after \u0432\u043C\u0435\u0441\u0442\u0435 \u043D\u0435 \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u044E\u0442\u0441\u044F: \u0432\u044B\u0431\u0435\u0440\u0438\u0442\u0435 \u043E\u0434\u043D\u043E \u043D\u0430\u043F\u0440\u0430\u0432\u043B\u0435\u043D\u0438\u0435.");
+  }
+  if (opts.after && opts.since) {
+    throw invalid3("\u041F\u0430\u0440\u0430\u043C\u0435\u0442\u0440\u044B --after \u0438 --since \u0432\u043C\u0435\u0441\u0442\u0435 \u043D\u0435 \u0438\u0441\u043F\u043E\u043B\u044C\u0437\u0443\u044E\u0442\u0441\u044F: --since \u043B\u0438\u0441\u0442\u0430\u0435\u0442 \u043D\u0430\u0437\u0430\u0434 \u0434\u043E \u0434\u0430\u0442\u044B.");
   }
   const full = opts.full === true;
   if (opts.after) {
@@ -11541,8 +11562,10 @@ async function diskSearch(ctx, text, opts) {
   const params = { QUERY: query, TYPE: "file", start };
   if (Object.keys(filter3).length > 0) params.FILTER = filter3;
   const resp = await ctx.client.call("disk.file.search", params);
-  const data = asArray(resp.result).filter(isObject2).slice(0, limit).map((f) => ({ ...entryOf(f), storageId: num(f.STORAGE_ID), folderId: num(f.PARENT_ID) }));
-  const next = typeof resp.next === "number" ? encodeCursor({ s: resp.next }) : null;
+  const found = asArray(resp.result).filter(isObject2);
+  const data = found.slice(0, limit).map((f) => ({ ...entryOf(f), storageId: num(f.STORAGE_ID), folderId: num(f.PARENT_ID) }));
+  const more = found.length > data.length || typeof resp.next === "number";
+  const next = more && data.length > 0 ? encodeCursor({ s: start + data.length }) : null;
   const notes = data.length === 0 ? ["\u041D\u0438\u0447\u0435\u0433\u043E \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u043E. \u041F\u043E\u0438\u0441\u043A \u043D\u0435 \u043E\u0445\u0432\u0430\u0442\u044B\u0432\u0430\u0435\u0442 \u0444\u0430\u0439\u043B\u044B \u0447\u0430\u0442\u043E\u0432."] : next ? ["\u0415\u0441\u0442\u044C \u0435\u0449\u0451: --page <next>."] : [];
   return envelope(data, next, notes);
 }
@@ -11563,10 +11586,25 @@ async function diskFile(ctx, idRaw) {
   const resp = await ctx.client.call("disk.file.get", { id: parseId(idRaw, "id") });
   return envelope(fileInfo(isObject2(resp.result) ? resp.result : {}));
 }
+var MAX_NAME_BYTES = 180;
+var MAX_EXT_BYTES = 20;
+function fitBytes(text, maxBytes) {
+  let out = "";
+  for (const ch of text) {
+    if (Buffer.byteLength(out + ch) > maxBytes) break;
+    out += ch;
+  }
+  return out;
+}
 function safeFileName(raw) {
   const base = raw.split(/[\\/]/).pop() ?? "";
   const cleaned = base.replace(/[\u0000-\u001f<>:"|?*]/g, "_").trim();
-  return cleaned === "" || cleaned === "." || cleaned === ".." ? "file" : cleaned;
+  if (cleaned === "" || cleaned === "." || cleaned === "..") return "file";
+  if (Buffer.byteLength(cleaned) <= MAX_NAME_BYTES) return cleaned;
+  const ext = import_node_path3.default.extname(cleaned);
+  const keepExt = Buffer.byteLength(ext) <= MAX_EXT_BYTES ? ext : "";
+  const stem = keepExt ? cleaned.slice(0, -keepExt.length) : cleaned;
+  return `${fitBytes(stem, MAX_NAME_BYTES - Buffer.byteLength(keepExt)).trimEnd()}${keepExt}`;
 }
 function uniquePath(dir, name2) {
   const ext = import_node_path3.default.extname(name2);
@@ -11629,21 +11667,22 @@ function registerDisk(program2, run) {
 
 // src/commands/feed.ts
 var PREVIEW_CHARS = 1e3;
-var isFeedCursor = (v) => isObject2(v) && Number.isSafeInteger(v.s) && Number.isSafeInteger(v.k) && v.s >= 0 && v.k >= 0;
+var isFeedCursor = (v) => isObject2(v) && Number.isSafeInteger(v.l) && v.l > 0;
 function plain(raw, tz) {
   const text = bbToText(raw, /* @__PURE__ */ new Map(), tz);
   return looksLikeHtml(text) ? htmlToText(text) : text;
 }
 async function feedList(ctx, opts) {
   const limit = parseLimit(opts.limit, 20, 50);
-  const cursor = opts.page ? decodeCursor(opts.page, "--page", isFeedCursor) : { s: 0, k: 0 };
   const params = {};
   if (opts.since) params.LOG_DATE_FROM = parseInputDate(opts.since, "start", "--since", ctx.tz);
   if (opts.until) params.LOG_DATE_TO = parseInputDate(opts.until, "end", "--until", ctx.tz);
-  params.start = cursor.s;
+  params.LAST_ID = opts.page ? decodeCursor(opts.page, "--page", isFeedCursor).l : 0;
+  params.LIMIT = limit;
   const resp = await ctx.client.call("log.blogpost.get", params);
-  const page = asArray(resp.result).filter(isObject2);
-  const posts = page.slice(cursor.k, cursor.k + limit);
+  const result = resp.result;
+  const posts = Array.isArray(result) ? result.filter(isObject2) : isObject2(result) ? Object.keys(result).filter((k) => /^\d+$/.test(k)).sort((a, b) => Number(a) - Number(b)).map((k) => result[k]).filter(isObject2) : [];
+  const nextId = typeof resp.next === "number" ? resp.next : isObject2(result) ? num(result.next) : null;
   const names = await lookupNames(ctx, posts.map((p) => num(p.AUTHOR_ID) ?? 0));
   const data = posts.map((p) => {
     const authorId = num(p.AUTHOR_ID) ?? 0;
@@ -11658,21 +11697,21 @@ async function feedList(ctx, opts) {
       comments: num(p.NUM_COMMENTS) ?? 0
     };
   });
-  let next = null;
-  if (cursor.k + limit < page.length) next = { s: cursor.s, k: cursor.k + limit };
-  else if (typeof resp.next === "number") next = { s: resp.next, k: 0 };
-  const notes = data.length === 0 ? ["\u041F\u043E\u0441\u0442\u043E\u0432 \u043D\u0435\u0442 \u0437\u0430 \u044D\u0442\u043E\u0442 \u043F\u0435\u0440\u0438\u043E\u0434."] : ["\u041F\u043E\u043B\u043D\u044B\u0439 \u0442\u0435\u043A\u0441\u0442 \u043F\u043E\u0441\u0442\u0430 \u0438 \u043A\u043E\u043C\u043C\u0435\u043D\u0442\u0430\u0440\u0438\u0438 \u2014 feed post <id>."];
+  const next = nextId !== null && nextId > 0 ? encodeCursor({ l: nextId }) : null;
+  const notes = data.length === 0 ? ["\u041F\u043E\u0441\u0442\u043E\u0432 \u043D\u0435\u0442 \u043D\u0430 \u044D\u0442\u043E\u0439 \u0441\u0442\u0440\u0430\u043D\u0438\u0446\u0435."] : ["\u041F\u043E\u043B\u043D\u044B\u0439 \u0442\u0435\u043A\u0441\u0442 \u043F\u043E\u0441\u0442\u0430 \u0438 \u043A\u043E\u043C\u043C\u0435\u043D\u0442\u0430\u0440\u0438\u0438 \u2014 feed post <id>."];
   if (next) notes.push("\u0415\u0441\u0442\u044C \u0435\u0449\u0451 \u043F\u043E\u0441\u0442\u044B: --page <next>.");
-  return envelope(data, next ? encodeCursor(next) : null, notes);
+  return envelope(data, next, notes);
 }
 async function feedPost(ctx, idRaw, opts) {
   const id = parseId(idRaw, "id");
   const limit = parseLimit(opts.comments, 20, 50, "--comments");
   const resp = await ctx.client.call("log.blogpost.get", { POST_ID: id });
   const p = asArray(resp.result).filter(isObject2)[0];
-  if (!p) throw unexpected2("log.blogpost.get.result");
+  if (!p) throw notFound();
   const commentsResp = await ctx.client.call("log.blogcomment.get", { POST_ID: id, LIMIT: limit });
-  const comments = isObject2(commentsResp.result) ? asArray(commentsResp.result.COMMENTS).filter(isObject2) : [];
+  const comments = (isObject2(commentsResp.result) ? asArray(commentsResp.result.COMMENTS).filter(isObject2) : []).sort(
+    (a, b) => (num(a.id) ?? 0) - (num(b.id) ?? 0)
+  );
   const names = await lookupNames(ctx, [num(p.AUTHOR_ID) ?? 0, ...comments.map((c) => num(c.author_id) ?? 0)]);
   const authorId = num(p.AUTHOR_ID) ?? 0;
   const text = plain(str(p.DETAIL_TEXT), ctx.tz);
@@ -11692,13 +11731,15 @@ async function feedPost(ctx, idRaw, opts) {
 }
 
 // src/commands/kb.ts
-var isCursor2 = (v) => isObject2(v);
+var isListCursor = (v) => isObject2(v) && isObject2(v.c) && Number.isSafeInteger(v.l) && v.l >= 1;
 async function kbList(ctx, opts) {
-  const pagination = { limit: parseLimit(opts.limit, 20, 50) };
-  if (opts.page) pagination.afterCursor = decodeCursor(opts.page, "--page", isCursor2);
+  const cursor = opts.page ? decodeCursor(opts.page, "--page", isListCursor) : null;
+  const limit = cursor ? cursor.l : parseLimit(opts.limit, 20, 50);
+  const pagination = { limit };
+  if (cursor) pagination.afterCursor = cursor.c;
   const resp = await ctx.client.callV3("note.collection.list", { pagination });
   const data = asArray(resp.items).filter(isObject2).map((c) => ({ id: num(c.id), name: str(c.name), updatedAt: str(c.updatedAt) || null, archived: c.isArchived === true }));
-  const next = isObject2(resp.nextCursor) ? encodeCursor(resp.nextCursor) : null;
+  const next = isObject2(resp.nextCursor) ? encodeCursor({ c: resp.nextCursor, l: limit }) : null;
   return envelope(data, next, data.length === 0 ? ["\u0411\u0430\u0437 \u0437\u043D\u0430\u043D\u0438\u0439 \u043D\u0435\u0442."] : next ? ["\u0415\u0441\u0442\u044C \u0435\u0449\u0451: --page <next>."] : []);
 }
 async function kbSearch(ctx, text, opts) {
@@ -11726,7 +11767,8 @@ async function kbTree(ctx, collectionRaw) {
 }
 async function kbDoc(ctx, idRaw, opts) {
   const resp = await ctx.client.callV3("note.document.get", { id: parseId(idRaw, "id") });
-  const d = isObject2(resp.item) ? resp.item : {};
+  const d = isObject2(resp.item) ? resp.item : null;
+  if (!d || num(d.id) === null) throw notFound();
   const markdown = str(d.markdown);
   const cut = opts.full ? { text: markdown, truncated: false } : truncate(markdown, MAX_TEXT_CHARS);
   return envelope(
@@ -11735,6 +11777,8 @@ async function kbDoc(ctx, idRaw, opts) {
       collectionId: num(d.collectionId),
       title: str(d.title),
       updatedAt: str(d.contentUpdatedAt) || str(d.updatedAt) || null,
+      archived: d.isArchived === true,
+      trashed: d.isTrashed === true,
       text: cut.text,
       ...cut.truncated ? { truncated: true } : {}
     },
@@ -11757,7 +11801,7 @@ function registerFeedKb(program2, run) {
 
 // src/commands/mail.ts
 var PREVIEW_CHARS2 = 300;
-var isPageCursor = (v) => isObject2(v) && typeof v.p === "number" && Number.isSafeInteger(v.p) && v.p >= 1;
+var isPageCursor = (v) => isObject2(v) && Number.isSafeInteger(v.p) && v.p >= 1 && Number.isSafeInteger(v.l) && v.l >= 1;
 function mailDate(raw) {
   const value = str(raw);
   return /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(value) ? value.replace(" ", "T") : value;
@@ -11784,8 +11828,9 @@ async function mailBoxes(ctx) {
   return envelope(data, null, data.length === 0 ? ["\u041F\u043E\u0447\u0442\u043E\u0432\u044B\u0445 \u044F\u0449\u0438\u043A\u043E\u0432 \u043D\u0435\u0442."] : []);
 }
 async function mailList(ctx, opts) {
-  const limit = parseLimit(opts.limit, 20, 50);
-  const page = opts.page ? decodeCursor(opts.page, "--page", isPageCursor).p : 1;
+  const cursor = opts.page ? decodeCursor(opts.page, "--page", isPageCursor) : null;
+  const limit = cursor ? cursor.l : parseLimit(opts.limit, 20, 50);
+  const page = cursor ? cursor.p : 1;
   const params = {};
   if (opts.box) params.mailboxId = parseId(opts.box, "--box");
   if (opts.search?.trim()) params.searchQuery = opts.search.trim();
@@ -11797,13 +11842,14 @@ async function mailList(ctx, opts) {
   params.pagination = { limit, page };
   const resp = await ctx.client.callV3("mail.message.list", params);
   const items = asArray(resp.items).filter(isObject2);
-  const next = items.length >= limit ? encodeCursor({ p: page + 1 }) : null;
+  const next = items.length >= limit ? encodeCursor({ p: page + 1, l: limit }) : null;
   const notes = items.length === 0 ? ["\u041F\u0438\u0441\u0435\u043C \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u043E."] : next ? ["\u0415\u0441\u0442\u044C \u0435\u0449\u0451 \u043F\u0438\u0441\u044C\u043C\u0430: --page <next>."] : [];
   return envelope(items.map(header), next, notes);
 }
 async function mailGet(ctx, idRaw, opts) {
   const resp = await ctx.client.callV3("mail.message.get", { id: parseId(idRaw, "id") });
-  const item = isObject2(resp.item) ? resp.item : resp;
+  const item = isObject2(resp.item) ? resp.item : null;
+  if (!item || num(item.id) === null) throw notFound();
   const text = mailBodyToText(str(item.body));
   const cut = opts.full ? { text, truncated: false } : truncate(text, MAX_TEXT_CHARS);
   return envelope(
@@ -11903,13 +11949,13 @@ async function worktimeRecords(ctx, opts) {
       ["userId", ctx.webhook.userId],
       ["startTime", "between", [parseInputDate(opts.from, "start", "--from", ctx.tz), parseInputDate(opts.to, "end", "--to", ctx.tz)]]
     ],
-    select: ["id", "startTime", "endTime", "duration", "breakLength", "state"],
+    // Без select: с ним Битрикс не отдаёт state (timeman-record-list.md).
     order: { startTime: "DESC" },
     pagination: { limit }
   });
   const records = asArray(resp.items).filter(isObject2).map((r) => ({ id: num(r.id), start: str(r.startTime), end: str(r.endTime) || null, durationSeconds: num(r.duration), breakSeconds: num(r.breakLength), state: str(r.state) }));
   const totalSeconds = records.reduce((sum, r) => sum + (r.durationSeconds ?? 0), 0);
-  const notes = records.length === 0 ? ["\u0417\u0430\u043F\u0438\u0441\u0435\u0439 \u043D\u0435\u0442 \u0437\u0430 \u044D\u0442\u043E\u0442 \u043F\u0435\u0440\u0438\u043E\u0434."] : records.length >= limit ? [`\u041F\u043E\u043A\u0430\u0437\u0430\u043D\u044B ${limit} \u0437\u0430\u043F\u0438\u0441\u0435\u0439 \u2014 \u0443\u0432\u0435\u043B\u0438\u0447\u044C\u0442\u0435 --limit \u0438\u043B\u0438 \u0441\u0443\u0437\u044C\u0442\u0435 \u043F\u0435\u0440\u0438\u043E\u0434.`] : [];
+  const notes = records.length === 0 ? ["\u0417\u0430\u043F\u0438\u0441\u0435\u0439 \u043D\u0435\u0442 \u0437\u0430 \u044D\u0442\u043E\u0442 \u043F\u0435\u0440\u0438\u043E\u0434."] : records.length >= limit ? [`\u041F\u043E\u043A\u0430\u0437\u0430\u043D\u044B ${limit} \u0437\u0430\u043F\u0438\u0441\u0435\u0439, \u0438 \u0441\u0443\u043C\u043C\u0430 \u2014 \u0442\u043E\u043B\u044C\u043A\u043E \u043F\u043E \u043D\u0438\u043C; \u0443\u0432\u0435\u043B\u0438\u0447\u044C\u0442\u0435 --limit \u0438\u043B\u0438 \u0441\u0443\u0437\u044C\u0442\u0435 \u043F\u0435\u0440\u0438\u043E\u0434.`] : [];
   return envelope({ records, totalSeconds }, null, notes);
 }
 
@@ -11929,7 +11975,7 @@ var GROUP_TYPES = ["group", "project", "scrum", "collab"];
 var PAGE2 = 50;
 var MAX_PAGES = 10;
 var ROLE_NAMES = { A: "\u0432\u043B\u0430\u0434\u0435\u043B\u0435\u0446", E: "\u043C\u043E\u0434\u0435\u0440\u0430\u0442\u043E\u0440", K: "\u0443\u0447\u0430\u0441\u0442\u043D\u0438\u043A", Z: "\u0437\u0430\u043F\u0440\u043E\u0441 \u043D\u0430 \u0432\u0441\u0442\u0443\u043F\u043B\u0435\u043D\u0438\u0435" };
-var isStartCursor2 = (v) => isObject2(v) && typeof v.s === "number" && Number.isSafeInteger(v.s) && v.s >= 0;
+var isPageCursor2 = (v) => isObject2(v) && Number.isSafeInteger(v.s) && Number.isSafeInteger(v.k) && v.s >= 0 && v.k >= 0;
 function pick(obj, camel, upper) {
   return obj[camel] !== void 0 ? obj[camel] : obj[upper];
 }
@@ -11949,14 +11995,16 @@ async function projectsList(ctx, opts) {
     if (mine.size === 0) return envelope([], null, ["\u0412\u044B \u043D\u0435 \u0441\u043E\u0441\u0442\u043E\u0438\u0442\u0435 \u043D\u0438 \u0432 \u043E\u0434\u043D\u043E\u0439 \u0433\u0440\u0443\u043F\u043F\u0435."]);
     filter3.ID = [...mine];
   }
-  let start = opts.page ? decodeCursor(opts.page, "--page", isStartCursor2).s : 0;
+  const cursor = opts.page ? decodeCursor(opts.page, "--page", isPageCursor2) : { s: 0, k: 0 };
+  let start = cursor.s;
+  let skip = cursor.k;
   const collected = [];
-  let nextStart = null;
+  let next = null;
   let stoppedByPages = false;
   for (let pages = 0; ; pages++) {
     if (pages >= MAX_PAGES) {
       stoppedByPages = true;
-      nextStart = start;
+      next = { s: start, k: 0 };
       break;
     }
     const resp = await ctx.client.call("socialnetwork.api.workgroup.list", {
@@ -11966,18 +12014,20 @@ async function projectsList(ctx, opts) {
       start
     });
     const groups = isObject2(resp.result) ? asArray(resp.result.workgroups).filter(isObject2) : [];
-    let i = 0;
+    let i = skip;
     for (; i < groups.length && collected.length < limit; i++) {
       const g = groups[i];
       if (!opts.type || str(pick(g, "type", "TYPE")) === opts.type) collected.push(g);
     }
     const morePages = typeof resp.next === "number" && groups.length > 0;
     if (collected.length >= limit) {
-      nextStart = i < groups.length || morePages ? start + i : null;
+      if (i < groups.length) next = { s: start, k: i };
+      else if (morePages) next = { s: resp.next, k: 0 };
       break;
     }
     if (!morePages) break;
     start = resp.next;
+    skip = 0;
   }
   const data = collected.map((g) => {
     const id = num(pick(g, "id", "ID")) ?? 0;
@@ -11993,8 +12043,8 @@ async function projectsList(ctx, opts) {
   const notes = [];
   if (data.length === 0) notes.push("\u041D\u0438\u0447\u0435\u0433\u043E \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u043E.");
   if (stoppedByPages) notes.push(`\u041F\u0440\u043E\u0441\u043C\u043E\u0442\u0440\u0435\u043D\u043E ${MAX_PAGES * PAGE2} \u0433\u0440\u0443\u043F\u043F; \u043F\u0440\u043E\u0434\u043E\u043B\u0436\u0438\u0442\u044C \u043F\u043E\u0438\u0441\u043A \u2014 --page <next>.`);
-  else if (nextStart !== null) notes.push("\u0415\u0441\u0442\u044C \u0435\u0449\u0451: --page <next>.");
-  return envelope(data, nextStart !== null ? encodeCursor({ s: nextStart }) : null, notes);
+  else if (next !== null) notes.push("\u0415\u0441\u0442\u044C \u0435\u0449\u0451: --page <next>.");
+  return envelope(data, next !== null ? encodeCursor(next) : null, notes);
 }
 async function projectsGet(ctx, idRaw) {
   const id = parseId(idRaw, "id");
@@ -12075,7 +12125,7 @@ var GET_SELECT = [
 ];
 var PAGE3 = 50;
 var IM_DIALOG_RE = /IM_DIALOG=(chat\d+|\d+)/g;
-var isStartCursor3 = (v) => isObject2(v) && typeof v.s === "number" && Number.isSafeInteger(v.s) && v.s >= 0;
+var isPageCursor3 = (v) => isObject2(v) && Number.isSafeInteger(v.s) && Number.isSafeInteger(v.k) && v.s >= 0 && v.k >= 0;
 function invalid5(message) {
   return new AppError({ code: "APP_CLI_INVALID_ARGUMENT", userMessage: message });
 }
@@ -12117,21 +12167,29 @@ async function tasksList(ctx, opts) {
   if (status2 === "done") base.REAL_STATUS = 5;
   if (opts.project) base.GROUP_ID = parseId(opts.project, "--project");
   if (opts.search?.trim()) base["%TITLE"] = opts.search.trim();
-  const start = opts.page ? decodeCursor(opts.page, "--page", isStartCursor3).s : 0;
-  const roles = role === "any" ? Object.keys(ROLE_FIELDS) : [role];
+  const cursor = opts.page ? decodeCursor(opts.page, "--page", isPageCursor3) : { s: 0, k: 0 };
+  const request = (r) => ctx.client.call("tasks.task.list", {
+    filter: { [ROLE_FIELDS[r]]: ctx.webhook.userId, ...base },
+    select: LIST_SELECT,
+    order: { CHANGED_DATE: "desc" },
+    start: cursor.s
+  });
+  const tasksOf = (resp) => isObject2(resp.result) ? asArray(resp.result.tasks).filter(isObject2) : [];
+  if (role !== "any") {
+    const resp = await request(role);
+    const page = tasksOf(resp);
+    const shown = page.slice(cursor.k, cursor.k + limit).map((t) => summary(t, [role]));
+    let next = null;
+    if (cursor.k + limit < page.length) next = { s: cursor.s, k: cursor.k + limit };
+    else if (typeof resp.next === "number") next = { s: resp.next, k: 0 };
+    const notes2 = shown.length === 0 ? ["\u0417\u0430\u0434\u0430\u0447 \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u043E."] : next ? ["\u0415\u0441\u0442\u044C \u0435\u0449\u0451 \u0437\u0430\u0434\u0430\u0447\u0438: --page <next>."] : [];
+    return envelope(shown, next ? encodeCursor(next) : null, notes2);
+  }
   const merged = /* @__PURE__ */ new Map();
-  let next;
   let anyFull = false;
-  for (const r of roles) {
-    const resp = await ctx.client.call("tasks.task.list", {
-      filter: { [ROLE_FIELDS[r]]: ctx.webhook.userId, ...base },
-      select: LIST_SELECT,
-      order: { CHANGED_DATE: "desc" },
-      start
-    });
-    const tasks = isObject2(resp.result) ? asArray(resp.result.tasks).filter(isObject2) : [];
+  for (const r of Object.keys(ROLE_FIELDS)) {
+    const tasks = tasksOf(await request(r));
     anyFull ||= tasks.length >= PAGE3;
-    next = resp.next;
     for (const t of tasks) {
       const id = num(t.id);
       if (id === null) continue;
@@ -12143,19 +12201,16 @@ async function tasksList(ctx, opts) {
   const sorted = [...merged.values()].sort((a, b) => (Date.parse(str(b.task.changedDate)) || 0) - (Date.parse(str(a.task.changedDate)) || 0)).slice(0, limit).map((e) => summary(e.task, e.roles));
   const notes = [];
   if (sorted.length === 0) notes.push("\u0417\u0430\u0434\u0430\u0447 \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u043E.");
-  let cursor = null;
-  if (role !== "any" && typeof next === "number") {
-    cursor = encodeCursor({ s: next });
-    notes.push("\u0415\u0441\u0442\u044C \u0435\u0449\u0451 \u0437\u0430\u0434\u0430\u0447\u0438: --page <next>.");
-  } else if (role === "any" && (anyFull || merged.size > limit)) {
+  if (anyFull || merged.size > limit) {
     notes.push("\u041F\u043E\u043A\u0430\u0437\u0430\u043D\u044B \u043F\u043E\u0441\u043B\u0435\u0434\u043D\u0438\u0435 \u0438\u0437\u043C\u0435\u043D\u0451\u043D\u043D\u044B\u0435 \u0437\u0430\u0434\u0430\u0447\u0438 \u043F\u043E \u0432\u0441\u0435\u043C \u0432\u0430\u0448\u0438\u043C \u0440\u043E\u043B\u044F\u043C; \u043F\u043E\u043B\u043D\u044B\u0439 \u0441\u043F\u0438\u0441\u043E\u043A \u2014 \u0441 --role \u0438 --page.");
   }
-  return envelope(sorted, cursor, notes);
+  return envelope(sorted, null, notes);
 }
 async function tasksGet(ctx, idRaw, opts) {
   const id = parseId(idRaw, "id");
   const resp = await ctx.client.call("tasks.task.get", { taskId: id, select: GET_SELECT });
-  const t = isObject2(resp.result) && isObject2(resp.result.task) ? resp.result.task : {};
+  const t = isObject2(resp.result) && isObject2(resp.result.task) ? resp.result.task : null;
+  if (!t || num(t.id) === null) throw notFound();
   const rawDescription = str(t.description);
   const text = bbToText(rawDescription, /* @__PURE__ */ new Map(), ctx.tz);
   const description = opts.full ? { text, truncated: false } : truncate(text, MAX_TEXT_CHARS);
@@ -12299,7 +12354,7 @@ async function status(ctx, check = () => checkForUpdate()) {
     );
     sections[section] = lacking.length === 0 ? "ok" : `\u043D\u0435\u0442 \u043F\u0440\u0430\u0432\u0430 ${lacking.join(", ")}`;
   }
-  const needed = /* @__PURE__ */ new Set([...Object.values(SECTION_SCOPES).flat(), ...USER_SCOPES, "basic"]);
+  const needed = /* @__PURE__ */ new Set([...Object.values(SECTION_SCOPES).flat(), "user_brief", "basic"]);
   const extra = granted.filter((s) => !needed.has(s));
   const notes = [];
   const missing = Object.entries(sections).filter(([, v]) => v !== "ok");
@@ -12385,7 +12440,7 @@ function buildProgram(run = runCommand) {
   registerOrgWorktime(program2, run);
   return program2;
 }
-var HELP_CODES = /* @__PURE__ */ new Set(["commander.helpDisplayed", "commander.help", "commander.version"]);
+var HELP_CODES = /* @__PURE__ */ new Set(["commander.helpDisplayed", "commander.version"]);
 function translate(err) {
   const token2 = /'([^']+)'/.exec(err.message)?.[1] ?? "";
   const messages = {
@@ -12394,7 +12449,8 @@ function translate(err) {
     "commander.missingArgument": `\u041D\u0435 \u0445\u0432\u0430\u0442\u0430\u0435\u0442 \u0430\u0440\u0433\u0443\u043C\u0435\u043D\u0442\u0430 \xAB${token2}\xBB. \u0421\u043F\u0440\u0430\u0432\u043A\u0430 \u043F\u043E \u043A\u043E\u043C\u0430\u043D\u0434\u0435: b24 <\u043A\u043E\u043C\u0430\u043D\u0434\u0430> --help.`,
     "commander.optionMissingArgument": `\u0423 \u043F\u0430\u0440\u0430\u043C\u0435\u0442\u0440\u0430 \xAB${token2}\xBB \u043D\u0435 \u0443\u043A\u0430\u0437\u0430\u043D\u043E \u0437\u043D\u0430\u0447\u0435\u043D\u0438\u0435.`,
     "commander.missingMandatoryOptionValue": `\u041D\u0435 \u0443\u043A\u0430\u0437\u0430\u043D \u043E\u0431\u044F\u0437\u0430\u0442\u0435\u043B\u044C\u043D\u044B\u0439 \u043F\u0430\u0440\u0430\u043C\u0435\u0442\u0440 \xAB${token2}\xBB.`,
-    "commander.excessArguments": "\u041B\u0438\u0448\u043D\u0438\u0435 \u0430\u0440\u0433\u0443\u043C\u0435\u043D\u0442\u044B \u0443 \u043A\u043E\u043C\u0430\u043D\u0434\u044B. \u0421\u043F\u0440\u0430\u0432\u043A\u0430 \u043F\u043E \u043A\u043E\u043C\u0430\u043D\u0434\u0435: b24 <\u043A\u043E\u043C\u0430\u043D\u0434\u0430> --help."
+    "commander.excessArguments": "\u041B\u0438\u0448\u043D\u0438\u0435 \u0430\u0440\u0433\u0443\u043C\u0435\u043D\u0442\u044B \u0443 \u043A\u043E\u043C\u0430\u043D\u0434\u044B. \u0421\u043F\u0440\u0430\u0432\u043A\u0430 \u043F\u043E \u043A\u043E\u043C\u0430\u043D\u0434\u0435: b24 <\u043A\u043E\u043C\u0430\u043D\u0434\u0430> --help.",
+    "commander.help": "\u041D\u0435 \u0443\u043A\u0430\u0437\u0430\u043D\u0430 \u043A\u043E\u043C\u0430\u043D\u0434\u0430. \u0421\u043F\u0438\u0441\u043E\u043A \u0440\u0430\u0437\u0434\u0435\u043B\u043E\u0432: b24 --help; \u043A\u043E\u043C\u0430\u043D\u0434\u044B \u0440\u0430\u0437\u0434\u0435\u043B\u0430: b24 <\u0440\u0430\u0437\u0434\u0435\u043B> --help."
   };
   return new AppError({
     code: "APP_CLI_INVALID_ARGUMENT",

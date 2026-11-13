@@ -42,10 +42,11 @@
 В обычном терминале (не через чат с ИИ):
 
 ```bash
-mkdir -p ~/.config/bitrix24-workspace && read -rsp 'Вставь адрес вебхука: ' U && printf 'BITRIX24_WORKSPACE_WEBHOOK_URL=%s\n' "$U" > ~/.config/bitrix24-workspace/.env && chmod 600 ~/.config/bitrix24-workspace/.env && unset U && echo ' готово'
+bash -c 'mkdir -p ~/.config/bitrix24-workspace && read -rsp "Вставь адрес вебхука: " U && printf "BITRIX24_WORKSPACE_WEBHOOK_URL=%s\n" "$U" > ~/.config/bitrix24-workspace/.env && chmod 600 ~/.config/bitrix24-workspace/.env && echo " готово"'
 ```
 
 Адрес не появится на экране и не попадёт в историю команд. Файл доступен только тебе.
+Команда обёрнута в `bash -c`, чтобы работать и в zsh (оболочка по умолчанию на macOS).
 
 Вместо файла можно задать переменную окружения `BITRIX24_WORKSPACE_WEBHOOK_URL` — она
 главнее файла (удобно для серверов и контейнеров). Файл `.env` в текущей папке скилл

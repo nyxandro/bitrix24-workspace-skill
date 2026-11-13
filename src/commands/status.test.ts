@@ -22,6 +22,16 @@ describe('status', () => {
     expect(JSON.stringify(out)).not.toContain('testsecret0000');
   });
 
+  it('право user шире нужного — помечено лишним, раздел сотрудников работает', async () => {
+    const { ctx } = fakeContext({
+      scope: () => ({ json: { result: ['im', 'user'] } }),
+      'user.current': () => ({ json: { result: { ID: '1', NAME: 'Иван' } } }),
+    });
+    const data = (await status(ctx, noUpdate)).data as { scopes: { extra: string[] }; sections: Record<string, string> };
+    expect(data.sections.users).toBe('ok');
+    expect(data.scopes.extra).toEqual(['user']);
+  });
+
   it('ключ не принят — APP_B24_AUTH_FAILED', async () => {
     const { ctx } = fakeContext({ scope: () => ({ status: 401, json: { error: 'INVALID_CREDENTIALS', error_description: 'x' } }) });
     await expect(status(ctx, noUpdate)).rejects.toMatchObject({ code: 'APP_B24_AUTH_FAILED' });

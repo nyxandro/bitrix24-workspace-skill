@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
-import { diskDownload, diskFile, diskLs, diskSearch, diskStorages } from './disk.js';
+import { diskDownload, diskFile, diskLs, diskSearch, diskStorages, safeFileName } from './disk.js';
 import { fakeContext } from './testkit.js';
 
 type M = Record<string, unknown>;
@@ -64,7 +64,17 @@ describe('disk ls, search, file', () => {
     expect(calls[0]?.body).toEqual({ QUERY: 'договор', TYPE: 'file', FILTER: { STORAGE_ID: 3 }, start: 0 });
     expect(JSON.stringify(out)).not.toMatch(/DOWNLOAD_URL|token/);
     await diskSearch(ctx, 'договор', { page: String(out.next) });
-    expect(calls[1]?.body).toMatchObject({ start: 50 });
+    expect(calls[1]?.body).toMatchObject({ start: 1 });
+  });
+
+  it('search --limit 20 — следующая страница начинается с 21-го, а не с 51-го', async () => {
+    const files = (start: number) => Array.from({ length: 50 }, (_, i) => fileInfo(`f${start + i + 1}.pdf`, 1));
+    const { ctx, calls } = fakeContext({ 'disk.file.search': (b) => ({ json: { result: files(Number(b.start)), next: Number(b.start) + 50 } }) });
+    const first = await diskSearch(ctx, 'договор', { limit: '20' });
+    expect((first.data as M[]).map((f) => f.name)[19]).toBe('f20.pdf');
+    const second = await diskSearch(ctx, 'договор', { limit: '20', page: String(first.next) });
+    expect(calls[1]?.body.start).toBe(20);
+    expect((second.data as M[])[0]?.name).toBe('f21.pdf');
   });
 
   it('file — сведения без ссылок', async () => {
@@ -88,6 +98,12 @@ describe('disk download', () => {
     const again = await diskDownload(ctxFor('Договор.pdf', 3), '4412', { out: dir });
     expect((again.data as M).path).toBe(path.join(dir, 'Договор (1).pdf'));
     expect(JSON.stringify(out)).not.toMatch(/token|testsecret0000/);
+  });
+
+  it('очень длинное русское имя обрезается до допустимого, расширение сохраняется', () => {
+    const name = safeFileName(`${'Договор поставки оборудования '.repeat(10)}.pdf`);
+    expect(Buffer.byteLength(name)).toBeLessThanOrEqual(180);
+    expect(name.endsWith('.pdf')).toBe(true);
   });
 
   it('имя с ../ сохраняется внутри папки', async () => {

@@ -71,11 +71,17 @@ install_into() {
 }
 
 install_into "$AGENTS_DIR"
-# В ~/.claude/skills — ссылка на ту же копию: обновление в одном месте.
+# В ~/.claude/skills — ссылка на ту же копию: обновление в одном месте. Если сама папка
+# ~/.claude/skills ведёт в ~/.agents/skills, скилл там уже есть — ничего не трогаем,
+# иначе удалили бы только что поставленную копию.
 mkdir -p "$CLAUDE_DIR"
-rm -rf "${CLAUDE_DIR:?}/${NAME}"
-ln -s "../../.agents/skills/${NAME}" "$CLAUDE_DIR/${NAME}"
-info "✓ ссылка для Claude Code: $CLAUDE_DIR/${NAME}"
+if [ "$(cd "$CLAUDE_DIR" && pwd -P)" = "$(cd "$AGENTS_DIR" && pwd -P)" ]; then
+  info "✓ $CLAUDE_DIR ведёт в $AGENTS_DIR — скилл виден и Claude Code"
+else
+  rm -rf "${CLAUDE_DIR:?}/${NAME}"
+  ln -s "../../.agents/skills/${NAME}" "$CLAUDE_DIR/${NAME}"
+  info "✓ ссылка для Claude Code: $CLAUDE_DIR/${NAME}"
+fi
 for dir in ${EXTRA_DIRS[@]+"${EXTRA_DIRS[@]}"}; do
   install_into "$dir"
 done

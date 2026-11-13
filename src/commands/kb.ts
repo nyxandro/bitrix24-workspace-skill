@@ -5,18 +5,21 @@ import { AppError } from '../api/errors.js';
 import { MAX_TEXT_CHARS } from '../config/config.js';
 import type { Envelope } from '../render/output.js';
 import { bbToText, truncate } from '../render/text.js';
-import { asArray, type CommandContext, decodeCursor, encodeCursor, envelope, isObject, type Json, num, parseId, parseLimit, str } from './common.js';
+import { asArray, type CommandContext, decodeCursor, encodeCursor, envelope, isObject, type Json, notFound, num, parseId, parseLimit, str } from './common.js';
 
-const isCursor = (v: unknown): v is Json => isObject(v);
+// note.collection.list требует тот же limit на всех страницах — курсор хранит его.
+const isListCursor = (v: unknown): v is { c: Json; l: number } => isObject(v) && isObject(v.c) && Number.isSafeInteger(v.l) && (v.l as number) >= 1;
 
 export async function kbList(ctx: CommandContext, opts: { limit?: string; page?: string }): Promise<Envelope> {
-  const pagination: Json = { limit: parseLimit(opts.limit, 20, 50) };
-  if (opts.page) pagination.afterCursor = decodeCursor(opts.page, '--page', isCursor);
+  const cursor = opts.page ? decodeCursor(opts.page, '--page', isListCursor) : null;
+  const limit = cursor ? cursor.l : parseLimit(opts.limit, 20, 50);
+  const pagination: Json = { limit };
+  if (cursor) pagination.afterCursor = cursor.c;
   const resp = await ctx.client.callV3<Json>('note.collection.list', { pagination });
   const data = asArray(resp.items)
     .filter(isObject)
     .map((c) => ({ id: num(c.id), name: str(c.name), updatedAt: str(c.updatedAt) || null, archived: c.isArchived === true }));
-  const next = isObject(resp.nextCursor) ? encodeCursor(resp.nextCursor) : null;
+  const next = isObject(resp.nextCursor) ? encodeCursor({ c: resp.nextCursor, l: limit }) : null;
   return envelope(data, next, data.length === 0 ? ['Баз знаний нет.'] : next ? ['Есть ещё: --page <next>.'] : []);
 }
 
@@ -51,7 +54,8 @@ export async function kbTree(ctx: CommandContext, collectionRaw: string): Promis
 
 export async function kbDoc(ctx: CommandContext, idRaw: string, opts: { full?: boolean }): Promise<Envelope> {
   const resp = await ctx.client.callV3<Json>('note.document.get', { id: parseId(idRaw, 'id') });
-  const d = isObject(resp.item) ? resp.item : {};
+  const d = isObject(resp.item) ? resp.item : null;
+  if (!d || num(d.id) === null) throw notFound();
   const markdown = str(d.markdown);
   const cut = opts.full ? { text: markdown, truncated: false } : truncate(markdown, MAX_TEXT_CHARS);
   return envelope(
@@ -60,6 +64,8 @@ export async function kbDoc(ctx: CommandContext, idRaw: string, opts: { full?: b
       collectionId: num(d.collectionId),
       title: str(d.title),
       updatedAt: str(d.contentUpdatedAt) || str(d.updatedAt) || null,
+      archived: d.isArchived === true,
+      trashed: d.isTrashed === true,
       text: cut.text,
       ...(cut.truncated ? { truncated: true } : {}),
     },

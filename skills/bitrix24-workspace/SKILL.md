@@ -40,6 +40,9 @@ description: Read-only access to the user's own Bitrix24 (Битрикс24) work
 node <каталог-скилла>/scripts/b24.cjs <команда> [параметры]
 ```
 
+Ниже `b24` — это сокращение для `node <каталог-скилла>/scripts/b24.cjs`: отдельной команды
+`b24` в системе нет.
+
 Ответ — JSON в stdout: `{ "data": …, "next": <курсор или null>, "notes": [строки] }`.
 - `notes` — пометки для тебя и пользователя (обрезано, есть ещё, ничего не найдено).
   Учитывай их в ответе.
@@ -58,7 +61,7 @@ node <каталог-скилла>/scripts/b24.cjs <команда> [парам�
 | Последние диалоги, непрочитанное | `chats recent [--unread] [--type private\|chat]`, `chats counters` |
 | Найти чат по названию | `chats find <текст>` (чаты задач так не ищутся — через `tasks get`) |
 | Кто в чате | `chats info <dialogId>` |
-| Прочитать переписку | `chats messages <dialogId> [--limit N] [--since ГГГГ-ММ-ДД] [--before id] [--after id] [--full]` |
+| Прочитать переписку | `chats messages <dialogId> [--limit N] [--since ГГГГ-ММ-ДД] [--before id] [--after id] [--full]` — `--since` отдаёт всё с даты (до 500) и не смотрит на `--limit`; `--after` с `--since` не сочетается |
 | Найти сообщения в чате | `chats search <dialogId> <текст> [--since] [--until]` |
 | Что мне прилетело | `notifications` |
 | Проекты, группы, коллабы | `projects list [--search] [--type collab\|project\|group\|scrum] [--mine]`, `projects get <id>` |
@@ -140,6 +143,10 @@ node <каталог-скилла>/scripts/b24.cjs <команда> [парам�
 | `APP_B24_FILE_TOO_LARGE` | Спросить пользователя, качать ли с `--max-mb` |
 | `APP_B24_OUTPUT_DIR_REQUIRED`, `APP_B24_OUTPUT_DIR_INVALID` | Указать существующую папку в `--out` |
 | `APP_B24_SECRET_IN_OUTPUT` | В данных оказался адрес вебхука — сказать пользователю перевыпустить вебхук |
+| `APP_B24_BAD_REQUEST` | Битрикс отклонил параметры — исправить вызов, не повторять |
+| `APP_B24_DOWNLOAD_FAILED` | Повторить позже; если файл с таким именем уже есть в папке — выбрать другую папку |
+| `APP_B24_PORTAL_MOVED` | Портал переадресует запросы (переименован?) — создать вебхук заново |
+| `APP_B24_METHOD_NOT_ALLOWED` | Ошибка программы (попытка вызвать не читающий метод) — сообщить разработчику |
 | `APP_CLI_INVALID_ARGUMENT` | Исправить вызов по тексту ошибки или `--help` |
 | `APP_B24_UNEXPECTED_RESPONSE`, `APP_UNEXPECTED` | Сбой программы — передать текст, предложить сообщить разработчику |
 

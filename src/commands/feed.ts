@@ -16,18 +16,18 @@ import {
   type Json,
   lookupNames,
   nameOf,
+  notFound,
   num,
   parseId,
   parseLimit,
   str,
-  unexpected,
 } from './common.js';
 
 const PREVIEW_CHARS = 1000;
-// Страница ленты всегда 50 записей (log-blogpost-get.md); курсор помнит, сколько
-// уже показано с текущей страницы, чтобы при --limit меньше 50 ничего не терялось.
-const isFeedCursor = (v: unknown): v is { s: number; k: number } =>
-  isObject(v) && Number.isSafeInteger(v.s) && Number.isSafeInteger(v.k) && (v.s as number) >= 0 && (v.k as number) >= 0;
+// Курсорный режим ленты (LAST_ID + LIMIT): записи по номеру, без повторов и пропусков.
+// В режиме start лента сортируется по дате обновления, и новый комментарий сдвигает пост
+// между страницами (log-blogpost-get.md).
+const isFeedCursor = (v: unknown): v is { l: number } => isObject(v) && Number.isSafeInteger(v.l) && (v.l as number) > 0;
 
 function plain(raw: string, tz: string): string {
   const text = bbToText(raw, new Map(), tz);
@@ -36,14 +36,26 @@ function plain(raw: string, tz: string): string {
 
 export async function feedList(ctx: CommandContext, opts: { since?: string; until?: string; limit?: string; page?: string }): Promise<Envelope> {
   const limit = parseLimit(opts.limit, 20, 50);
-  const cursor = opts.page ? decodeCursor(opts.page, '--page', isFeedCursor) : { s: 0, k: 0 };
   const params: Json = {};
   if (opts.since) params.LOG_DATE_FROM = parseInputDate(opts.since, 'start', '--since', ctx.tz);
   if (opts.until) params.LOG_DATE_TO = parseInputDate(opts.until, 'end', '--until', ctx.tz);
-  params.start = cursor.s;
+  params.LAST_ID = opts.page ? decodeCursor(opts.page, '--page', isFeedCursor).l : 0;
+  params.LIMIT = limit;
   const resp = await ctx.client.call<unknown>('log.blogpost.get', params);
-  const page = asArray(resp.result).filter(isObject);
-  const posts = page.slice(cursor.k, cursor.k + limit);
+  // По документации в курсорном режиме result — объект с постами под числовыми ключами и
+  // полем next внутри; живой портал отдаёт посты массивом, а next — на верхнем уровне
+  // ответа (проверено). Поддерживаем оба вида. next — номер записи ленты, не поста.
+  const result = resp.result;
+  const posts = Array.isArray(result)
+    ? result.filter(isObject)
+    : isObject(result)
+      ? Object.keys(result)
+          .filter((k) => /^\d+$/.test(k))
+          .sort((a, b) => Number(a) - Number(b))
+          .map((k) => result[k])
+          .filter(isObject)
+      : [];
+  const nextId = typeof resp.next === 'number' ? resp.next : isObject(result) ? num(result.next) : null;
   const names = await lookupNames(ctx, posts.map((p) => num(p.AUTHOR_ID) ?? 0));
   const data = posts.map((p) => {
     const authorId = num(p.AUTHOR_ID) ?? 0;
@@ -58,12 +70,10 @@ export async function feedList(ctx: CommandContext, opts: { since?: string; unti
       comments: num(p.NUM_COMMENTS) ?? 0,
     };
   });
-  let next: { s: number; k: number } | null = null;
-  if (cursor.k + limit < page.length) next = { s: cursor.s, k: cursor.k + limit };
-  else if (typeof resp.next === 'number') next = { s: resp.next, k: 0 };
-  const notes = data.length === 0 ? ['Постов нет за этот период.'] : ['Полный текст поста и комментарии — feed post <id>.'];
+  const next = nextId !== null && nextId > 0 ? encodeCursor({ l: nextId }) : null;
+  const notes = data.length === 0 ? ['Постов нет на этой странице.'] : ['Полный текст поста и комментарии — feed post <id>.'];
   if (next) notes.push('Есть ещё посты: --page <next>.');
-  return envelope(data, next ? encodeCursor(next) : null, notes);
+  return envelope(data, next, notes);
 }
 
 export async function feedPost(ctx: CommandContext, idRaw: string, opts: { full?: boolean; comments?: string }): Promise<Envelope> {
@@ -71,9 +81,11 @@ export async function feedPost(ctx: CommandContext, idRaw: string, opts: { full?
   const limit = parseLimit(opts.comments, 20, 50, '--comments');
   const resp = await ctx.client.call<unknown>('log.blogpost.get', { POST_ID: id });
   const p = asArray(resp.result).filter(isObject)[0];
-  if (!p) throw unexpected('log.blogpost.get.result');
+  if (!p) throw notFound();
   const commentsResp = await ctx.client.call<Json>('log.blogcomment.get', { POST_ID: id, LIMIT: limit });
-  const comments = isObject(commentsResp.result) ? asArray(commentsResp.result.COMMENTS).filter(isObject) : [];
+  const comments = (isObject(commentsResp.result) ? asArray(commentsResp.result.COMMENTS).filter(isObject) : []).sort(
+    (a, b) => (num(a.id) ?? 0) - (num(b.id) ?? 0),
+  );
   const names = await lookupNames(ctx, [num(p.AUTHOR_ID) ?? 0, ...comments.map((c) => num(c.author_id) ?? 0)]);
   const authorId = num(p.AUTHOR_ID) ?? 0;
   const text = plain(str(p.DETAIL_TEXT), ctx.tz);

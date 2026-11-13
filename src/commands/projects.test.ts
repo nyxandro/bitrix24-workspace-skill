@@ -34,6 +34,19 @@ describe('projects list', () => {
     expect(calls.filter((c) => c.method === 'socialnetwork.api.workgroup.list').map((c) => c.body.start)).toEqual([0, 50]);
   });
 
+  it('--type collab --limit 1: next продолжает с той же страницы после найденной, без повторов', async () => {
+    const page = Array.from({ length: 50 }, (_, i) => wg(i + 1, i === 3 || i === 10 ? 'collab' : 'group'));
+    const { ctx, calls } = fakeContext({
+      'socialnetwork.api.workgroup.list': () => ({ json: { result: { workgroups: page }, total: 50 } }),
+      'sonet_group.user.groups': () => ({ json: { result: [] } }),
+    });
+    const first = await projectsList(ctx, { type: 'collab', limit: '1' });
+    expect((first.data as M[]).map((g) => g.id)).toEqual([4]);
+    const second = await projectsList(ctx, { type: 'collab', limit: '1', page: String(first.next) });
+    expect((second.data as M[]).map((g) => g.id)).toEqual([11]);
+    expect(calls.filter((c) => c.method === 'socialnetwork.api.workgroup.list').every((c) => c.body.start === 0)).toBe(true);
+  });
+
   it('--mine — только группы, где я участник', async () => {
     const { ctx, calls } = fakeContext({
       'sonet_group.user.groups': () => ({ json: { result: [{ GROUP_ID: '15' }, { GROUP_ID: '20' }] } }),

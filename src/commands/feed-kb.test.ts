@@ -8,15 +8,39 @@ const post = (id: number, text = '[B]Новость[/B]') => ({ ID: String(id), 
 const users = () => ({ json: { result: [{ ID: '5', NAME: 'Иван', LAST_NAME: 'Петров' }, { ID: '6', NAME: 'Анна', LAST_NAME: 'С' }] } });
 
 describe('feed', () => {
-  it('list — посты с авторами, текст обрезан до превью, период и страницы', async () => {
-    const { ctx, calls } = fakeContext({ 'log.blogpost.get': () => ({ json: { result: [post(2, 'а'.repeat(2000)), post(1)], next: 50 } }), 'user.get': users });
-    const out = await feedList(ctx, { since: '2026-11-01', limit: '1' });
-    expect(calls[0]?.body).toEqual({ LOG_DATE_FROM: '2026-11-01T00:00:00+03:00', start: 0 });
+  it('list — курсорный режим LAST_ID + LIMIT: посты по порядку записей, без повторов и пропусков', async () => {
+    const { ctx, calls } = fakeContext({
+      'log.blogpost.get': [
+        () => ({ json: { result: { 0: post(2, 'а'.repeat(2000)), 1: post(1), next: 777 } } }),
+        () => ({ json: { result: [] } }),
+      ],
+      'user.get': users,
+    });
+    const out = await feedList(ctx, { since: '2026-11-01', limit: '2' });
+    expect(calls[0]?.body).toEqual({ LOG_DATE_FROM: '2026-11-01T00:00:00+03:00', LAST_ID: 0, LIMIT: 2 });
     const data = out.data as M[];
-    expect(data).toHaveLength(1);
-    expect(data[0]).toMatchObject({ id: 2, author: { id: 5, name: 'Иван Петров' }, title: 'Пост 2', comments: 2, truncated: true });
+    expect(data.map((p) => p.id)).toEqual([2, 1]);
+    expect(data[0]).toMatchObject({ author: { id: 5, name: 'Иван Петров' }, title: 'Пост 2', comments: 2, truncated: true });
     expect(String(data[0]?.text)).toHaveLength(1000);
-    expect(out.next).not.toBeNull();
+    const last = await feedList(ctx, { since: '2026-11-01', limit: '2', page: String(out.next) });
+    expect(calls.filter((c) => c.method === 'log.blogpost.get')[1]?.body).toMatchObject({ LAST_ID: 777, LIMIT: 2 });
+    expect(last.next).toBeNull();
+  });
+
+  it('list — вид ответа живого портала: посты массивом, next на верхнем уровне', async () => {
+    const { ctx, calls } = fakeContext({
+      'log.blogpost.get': [() => ({ json: { result: [post(890), post(889)], next: 91164 } }), () => ({ json: { result: [post(888)] } })],
+      'user.get': users,
+    });
+    const out = await feedList(ctx, { limit: '2' });
+    expect((out.data as M[]).map((p) => p.id)).toEqual([890, 889]);
+    await feedList(ctx, { limit: '2', page: String(out.next) });
+    expect(calls.filter((c) => c.method === 'log.blogpost.get')[1]?.body).toEqual({ LAST_ID: 91164, LIMIT: 2 });
+  });
+
+  it('post — нет такого поста: APP_B24_NOT_FOUND; комментарии по порядку', async () => {
+    const { ctx } = fakeContext({ 'log.blogpost.get': () => ({ json: { result: [] } }) });
+    await expect(feedPost(ctx, '99', {})).rejects.toMatchObject({ code: 'APP_B24_NOT_FOUND' });
   });
 
   it('post — пост и комментарии, без ссылок на файлы', async () => {
@@ -65,6 +89,11 @@ describe('kb', () => {
       { id: 1, title: 'Раздел', level: 0 },
       { id: 2, title: 'Документ', level: 1 },
     ]);
+  });
+
+  it('doc — нет документа: APP_B24_NOT_FOUND', async () => {
+    const { ctx } = fakeContext({ 'note.document.get': () => ({ json: { result: {} } }) });
+    await expect(kbDoc(ctx, '7', {})).rejects.toMatchObject({ code: 'APP_B24_NOT_FOUND' });
   });
 
   it('doc — Markdown как есть, обрезка и --full', async () => {

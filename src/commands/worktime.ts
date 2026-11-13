@@ -31,7 +31,7 @@ export async function worktimeRecords(ctx: CommandContext, opts: { from?: string
       ['userId', ctx.webhook.userId],
       ['startTime', 'between', [parseInputDate(opts.from, 'start', '--from', ctx.tz), parseInputDate(opts.to, 'end', '--to', ctx.tz)]],
     ],
-    select: ['id', 'startTime', 'endTime', 'duration', 'breakLength', 'state'],
+    // Без select: с ним Битрикс не отдаёт state (timeman-record-list.md).
     order: { startTime: 'DESC' },
     pagination: { limit },
   });
@@ -39,6 +39,6 @@ export async function worktimeRecords(ctx: CommandContext, opts: { from?: string
     .filter(isObject)
     .map((r) => ({ id: num(r.id), start: str(r.startTime), end: str(r.endTime) || null, durationSeconds: num(r.duration), breakSeconds: num(r.breakLength), state: str(r.state) }));
   const totalSeconds = records.reduce((sum, r) => sum + (r.durationSeconds ?? 0), 0);
-  const notes = records.length === 0 ? ['Записей нет за этот период.'] : records.length >= limit ? [`Показаны ${limit} записей — увеличьте --limit или сузьте период.`] : [];
+  const notes = records.length === 0 ? ['Записей нет за этот период.'] : records.length >= limit ? [`Показаны ${limit} записей, и сумма — только по ним; увеличьте --limit или сузьте период.`] : [];
   return envelope({ records, totalSeconds }, null, notes);
 }
