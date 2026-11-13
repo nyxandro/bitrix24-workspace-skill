@@ -1,0 +1,9 @@
+node_modules/
+dist/
+.env
+*.log
+*.skill
+!/bitrix24-workspace.skill
+.mcp.json
+.claude/settings.local.json
+.claude/*.lock

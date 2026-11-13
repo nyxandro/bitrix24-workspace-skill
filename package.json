@@ -1,0 +1,42 @@
+{
+  "name": "bitrix24-workspace-skill",
+  "version": "0.1.0",
+  "description": "Скилл + CLI только на чтение для ИИ-агентов: чаты, задачи, проекты, диск, почта, календарь, встречи, лента, база знаний Битрикс24 через входящий вебхук",
+  "type": "module",
+  "private": true,
+  "license": "MIT",
+  "bin": {
+    "b24": "./dist/cli.js"
+  },
+  "engines": {
+    "node": ">=20.19"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "build:skill": "esbuild src/cli.ts --bundle --platform=node --target=node20 --format=cjs --outfile=skills/bitrix24-workspace/scripts/b24.cjs",
+    "pack:skill": "npm run build:skill && python3 scripts/pack-skill.py",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "commander": "^14.0.3",
+    "dotenv": "^17.4.2",
+    "html-to-text": "^10.0.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@types/html-to-text": "^9.0.4",
+    "@types/node": "^24.19.2",
+    "esbuild": "^0.28.2",
+    "eslint": "^10.14.0",
+    "fast-check": "^4.10.2",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.72.2",
+    "vitest": "^5.1.0"
+  },
+  "allowScripts": {
+    "esbuild@0.28.2": true
+  }
+}
