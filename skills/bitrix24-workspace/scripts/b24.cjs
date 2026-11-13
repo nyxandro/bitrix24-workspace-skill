@@ -3887,9 +3887,23 @@ function parseWebhook(raw) {
 }
 
 // src/cli/runtime.ts
-function bootstrapEnv(envPath = ENV_PATH) {
-  if (import_node_fs.default.existsSync(envPath)) {
-    import_dotenv.default.config({ path: envPath, quiet: true });
+function bootstrapEnv(envPath = ENV_PATH, env = process.env) {
+  let content;
+  try {
+    content = import_node_fs.default.readFileSync(envPath, "utf8");
+  } catch (err) {
+    if (err.code === "ENOENT") {
+      return;
+    }
+    throw new AppError({
+      code: "APP_B24_CONFIG_UNREADABLE",
+      userMessage: `\u041D\u0435 \u0443\u0434\u0430\u043B\u043E\u0441\u044C \u043F\u0440\u043E\u0447\u0438\u0442\u0430\u0442\u044C \u0444\u0430\u0439\u043B \u043D\u0430\u0441\u0442\u0440\u043E\u0435\u043A ${ENV_PATH_DISPLAY}: \u043F\u0440\u043E\u0432\u0435\u0440\u044C\u0442\u0435, \u0447\u0442\u043E \u044D\u0442\u043E \u0444\u0430\u0439\u043B \u0438 \u0443 \u0432\u0430\u0441 \u0435\u0441\u0442\u044C \u043F\u0440\u0430\u0432\u0430 \u043D\u0430 \u0447\u0442\u0435\u043D\u0438\u0435.`,
+      cause: err
+    });
+  }
+  const value = import_dotenv.default.parse(content)[WEBHOOK_ENV];
+  if (value !== void 0 && !env[WEBHOOK_ENV]) {
+    env[WEBHOOK_ENV] = value;
   }
 }
 function secretsFromEnv(env = process.env) {
@@ -3904,27 +3918,53 @@ function secretsFromEnv(env = process.env) {
   }
   return secrets;
 }
-function describeDetails(err) {
-  if (err instanceof AppError) {
-    const cause = err.cause instanceof Error ? `${err.cause.name}: ${err.cause.message}` : err.cause;
-    return `\u0414\u0435\u0442\u0430\u043B\u0438: ${JSON.stringify({ details: err.details ?? null, cause: cause ?? null })}`;
+function isDebug(env = process.env) {
+  return ["1", "true", "yes", "on"].includes((env[DEBUG_ENV] ?? "").trim().toLowerCase());
+}
+var MAX_CAUSE_DEPTH = 4;
+function describeCauses(err) {
+  const lines = [];
+  let current = err instanceof AppError ? err.cause : err;
+  for (let depth = 0; current !== void 0 && current !== null && depth < MAX_CAUSE_DEPTH; depth += 1) {
+    if (current instanceof Error) {
+      const code = current.code;
+      lines.push(`\u041F\u0440\u0438\u0447\u0438\u043D\u0430: ${current.name}: ${current.message}${code ? ` (${code})` : ""}`);
+      current = current.cause;
+    } else {
+      lines.push(`\u041F\u0440\u0438\u0447\u0438\u043D\u0430: ${String(current)}`);
+      current = void 0;
+    }
   }
-  return err instanceof Error ? `\u0414\u0435\u0442\u0430\u043B\u0438: ${err.name}: ${err.message}` : `\u0414\u0435\u0442\u0430\u043B\u0438: ${String(err)}`;
+  return lines;
 }
 function formatError(err, secrets, debug) {
   const lines = err instanceof AppError ? [`\u041E\u0448\u0438\u0431\u043A\u0430: ${err.userMessage} [${err.code}]`] : [`\u041E\u0448\u0438\u0431\u043A\u0430: \u041D\u0435\u043F\u0440\u0435\u0434\u0432\u0438\u0434\u0435\u043D\u043D\u0430\u044F \u043E\u0448\u0438\u0431\u043A\u0430. \u0417\u0430\u043F\u0443\u0441\u0442\u0438\u0442\u0435 \u0441 ${DEBUG_ENV}=1, \u0447\u0442\u043E\u0431\u044B \u0443\u0432\u0438\u0434\u0435\u0442\u044C \u043F\u043E\u0434\u0440\u043E\u0431\u043D\u043E\u0441\u0442\u0438. [APP_UNEXPECTED]`];
   if (debug) {
-    lines.push(describeDetails(err));
+    if (err instanceof AppError && err.details !== void 0) {
+      lines.push(`\u0414\u0435\u0442\u0430\u043B\u0438: ${JSON.stringify(err.details)}`);
+    }
+    lines.push(...describeCauses(err));
   }
   return lines.map((line) => redact(line, secrets));
 }
-function printErrorAndExit(err, secrets = secretsFromEnv()) {
-  for (const line of formatError(err, secrets, Boolean(process.env[DEBUG_ENV]))) {
+function reportError(err, secrets = secretsFromEnv()) {
+  for (const line of formatError(err, secrets, isDebug())) {
     console.error(line);
   }
-  process.exit(1);
+  process.exitCode = 1;
 }
 
 // src/cli.ts
-bootstrapEnv();
-buildProgram().parseAsync(process.argv).catch((err) => printErrorAndExit(err));
+process.on("uncaughtException", (err) => {
+  reportError(err);
+  process.exit(1);
+});
+process.on("unhandledRejection", (err) => {
+  reportError(err);
+  process.exit(1);
+});
+async function main() {
+  bootstrapEnv();
+  await buildProgram().parseAsync(process.argv);
+}
+main().catch((err) => reportError(err));

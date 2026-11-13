@@ -2,14 +2,17 @@
  * Даты: в выводе — ISO 8601 со смещением; на входе — дата или дата-время.
  *
  * - formatInZone(epochMs, tz) — мгновение в часовом поясе, «2024-12-11T17:59:00+03:00»;
- * - calendarDate(event, 'FROM'|'TO') — время события календаря из *_TS_UTC и TZ_*
- *   (сами DATE_FROM/DATE_TO приходят в виде «12/11/2024 05:59:00 pm» без зоны);
- * - parseInputDate(raw, edge, option, tz) — ввод агента: дата без времени —
- *   начало или конец дня в зоне машины.
+ * - calendarDate(event, 'FROM'|'TO') — время события календаря из DATE_* и TZ_*.
+ *   Поле *_TS_UTC вопреки имени сдвинуто на зону сервера, по документации его
+ *   нельзя читать как UTC. DATE_* приходит в записи портала: «11/20/2026 10:00:00 am»,
+ *   «20.11.2026 10:00:00» или «2026-11-20 10:00:00»;
+ * - parseInputDate(raw, edge, option, tz) — ввод агента: дата без времени — первое
+ *   или последнее мгновение этого дня в зоне машины.
  */
 import { AppError } from '../api/errors.js';
 
 const pad = (n: number, width = 2) => String(Math.abs(n)).padStart(width, '0');
+const HOUR_MS = 3_600_000;
 
 function zoneParts(epochMs: number, tz: string) {
   const parts = new Intl.DateTimeFormat('en-US', {
@@ -33,24 +36,62 @@ function offsetMinutes(epochMs: number, tz: string): number {
   return Math.round((asUtc - Math.floor(epochMs / 1000) * 1000) / 60000);
 }
 
-export function formatInZone(epochMs: number, tz: string): string {
-  const p = zoneParts(epochMs, tz);
-  const off = offsetMinutes(epochMs, tz);
-  const sign = off >= 0 ? '+' : '-';
-  return `${pad(p.y, 4)}-${pad(p.m)}-${pad(p.d)}T${pad(p.h)}:${pad(p.mi)}:${pad(p.s)}${sign}${pad(Math.floor(Math.abs(off) / 60))}:${pad(Math.abs(off) % 60)}`;
+function formatOffset(minutes: number): string {
+  const sign = minutes >= 0 ? '+' : '-';
+  return `${sign}${pad(Math.floor(Math.abs(minutes) / 60))}:${pad(Math.abs(minutes) % 60)}`;
 }
 
-function formatDateInZone(epochMs: number, tz: string): string {
+function wall(y: number, m: number, d: number, h: number, mi: number, s: number): string {
+  return `${pad(y, 4)}-${pad(m)}-${pad(d)}T${pad(h)}:${pad(mi)}:${pad(s)}`;
+}
+
+export function formatInZone(epochMs: number, tz: string): string {
+  const p = zoneParts(epochMs, tz);
+  return `${wall(p.y, p.m, p.d, p.h, p.mi, p.s)}${formatOffset(offsetMinutes(epochMs, tz))}`;
+}
+
+export function localDateKey(epochMs: number, tz: string): string {
   const p = zoneParts(epochMs, tz);
   return `${pad(p.y, 4)}-${pad(p.m)}-${pad(p.d)}`;
 }
 
-// Настенное время в зоне → мгновение. Две итерации покрывают переход на летнее время.
-function wallTimeToEpoch(y: number, m: number, d: number, h: number, mi: number, s: number, tz: string): number {
+// Настенное время в зоне → мгновение. Перебираем смещения, действующие рядом,
+// и берём самое раннее мгновение с точно таким настенным временем.
+// Если такого времени нет (пропущено при переходе на летнее), возвращаем null.
+function wallTimeToEpoch(y: number, m: number, d: number, h: number, mi: number, s: number, tz: string): number | null {
   const guess = Date.UTC(y, m - 1, d, h, mi, s);
-  let epoch = guess - offsetMinutes(guess, tz) * 60000;
-  epoch = guess - offsetMinutes(epoch, tz) * 60000;
-  return epoch;
+  const offsets = new Set([-24, -12, 0, 12, 24].map((shift) => offsetMinutes(guess + shift * HOUR_MS, tz)));
+  const target = wall(y, m, d, h, mi, s);
+  const hits = [...offsets]
+    .map((off) => guess - off * 60000)
+    .filter((epoch) => {
+      const p = zoneParts(epoch, tz);
+      return wall(p.y, p.m, p.d, p.h, p.mi, p.s) === target;
+    });
+  return hits.length > 0 ? Math.min(...hits) : null;
+}
+
+// Первое мгновение суток в зоне. Обычно это 00:00:00; если полночь пропущена
+// (переход на летнее время в полночь), — первое существующее мгновение дня.
+function startOfDay(y: number, m: number, d: number, tz: string): number {
+  const exact = wallTimeToEpoch(y, m, d, 0, 0, 0, tz);
+  if (exact !== null) {
+    return exact;
+  }
+  const day = `${pad(y, 4)}-${pad(m)}-${pad(d)}`;
+  const guess = Date.UTC(y, m - 1, d);
+  let lo = guess - 14 * HOUR_MS;
+  let hi = guess + 14 * HOUR_MS;
+  // Рядом с пропущенной полночью местная дата не убывает — ищем первую секунду дня.
+  while (hi - lo > 1000) {
+    const mid = lo + Math.floor((hi - lo) / 2000) * 1000;
+    if (localDateKey(mid, tz) >= day) {
+      hi = mid;
+    } else {
+      lo = mid;
+    }
+  }
+  return hi;
 }
 
 export function machineTimeZone(): string {
@@ -66,19 +107,87 @@ function isValidZone(tz: string): boolean {
   }
 }
 
-export function calendarDate(event: Record<string, unknown>, edge: 'FROM' | 'TO'): string {
-  const ts = Number(event[`DATE_${edge}_TS_UTC`]);
-  if (!Number.isFinite(ts) || event[`DATE_${edge}_TS_UTC`] === undefined || event[`DATE_${edge}_TS_UTC`] === '') {
-    throw new AppError({
-      code: 'APP_B24_UNEXPECTED_RESPONSE',
-      userMessage: 'Битрикс24 вернул данные в неожиданном виде — команда не может их разобрать.',
-      details: { field: `DATE_${edge}_TS_UTC` },
-    });
+function unexpectedDate(field: string): AppError {
+  return new AppError({
+    code: 'APP_B24_UNEXPECTED_RESPONSE',
+    userMessage: 'Битрикс24 вернул данные в неожиданном виде — команда не может их разобрать.',
+    details: { field },
+  });
+}
+
+function checkCalendarDay(y: number, m: number, d: number): boolean {
+  const date = new Date(Date.UTC(y, m - 1, d));
+  return date.getUTCFullYear() === y && date.getUTCMonth() === m - 1 && date.getUTCDate() === d;
+}
+
+const US_RE = /^(\d{2})\/(\d{2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?\s*(am|pm)?)?$/i;
+const DOT_RE = /^(\d{2})\.(\d{2})\.(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::(\d{2}))?)?$/;
+const ISO_RE = /^(\d{4})-(\d{2})-(\d{2})(?:[ T](\d{2}):(\d{2})(?::(\d{2}))?)?$/;
+
+interface Wall {
+  y: number;
+  m: number;
+  d: number;
+  h: number;
+  mi: number;
+  s: number;
+}
+
+function parsePortalWall(raw: string): Wall | null {
+  const value = raw.trim();
+  let y: number, m: number, d: number, h: number, mi: number, s: number;
+  let match = US_RE.exec(value);
+  if (match) {
+    [m, d, y] = [Number(match[1]), Number(match[2]), Number(match[3])];
+    [h, mi, s] = [Number(match[4] ?? 0), Number(match[5] ?? 0), Number(match[6] ?? 0)];
+    const meridiem = match[7]?.toLowerCase();
+    if (meridiem !== undefined) {
+      if (h < 1 || h > 12) {
+        return null;
+      }
+      h = (h % 12) + (meridiem === 'pm' ? 12 : 0);
+    }
+  } else if ((match = DOT_RE.exec(value))) {
+    [d, m, y] = [Number(match[1]), Number(match[2]), Number(match[3])];
+    [h, mi, s] = [Number(match[4] ?? 0), Number(match[5] ?? 0), Number(match[6] ?? 0)];
+  } else if ((match = ISO_RE.exec(value))) {
+    [y, m, d] = [Number(match[1]), Number(match[2]), Number(match[3])];
+    [h, mi, s] = [Number(match[4] ?? 0), Number(match[5] ?? 0), Number(match[6] ?? 0)];
+  } else {
+    return null;
   }
-  const rawTz = event[`TZ_${edge}`];
-  // Без зоны показываем то же мгновение в UTC — время не выдумываем.
-  const tz = typeof rawTz === 'string' && rawTz !== '' && isValidZone(rawTz) ? rawTz : 'UTC';
-  return event.DT_SKIP_TIME === 'Y' ? formatDateInZone(ts * 1000, tz) : formatInZone(ts * 1000, tz);
+  if (!checkCalendarDay(y, m, d) || h > 23 || mi > 59 || s > 59) {
+    return null;
+  }
+  return { y, m, d, h, mi, s };
+}
+
+export function calendarDate(event: Record<string, unknown>, edge: 'FROM' | 'TO'): string {
+  const field = `DATE_${edge}`;
+  const raw = event[field];
+  const parsed = typeof raw === 'string' ? parsePortalWall(raw) : null;
+  if (parsed === null) {
+    throw unexpectedDate(field);
+  }
+  const { y, m, d, h, mi, s } = parsed;
+  if (event.DT_SKIP_TIME === 'Y') {
+    return `${pad(y, 4)}-${pad(m)}-${pad(d)}`;
+  }
+  const tz = event[`TZ_${edge}`];
+  if (typeof tz === 'string' && tz !== '' && isValidZone(tz)) {
+    const exact = wallTimeToEpoch(y, m, d, h, mi, s, tz);
+    // Настенного времени нет (пропущено при переходе на летнее): читаем его со
+    // смещением, действовавшим до перехода, — получается мгновение сразу после разрыва.
+    const guess = Date.UTC(y, m - 1, d, h, mi, s);
+    const epoch = exact ?? guess - offsetMinutes(guess - 12 * HOUR_MS, tz) * 60000;
+    return formatInZone(epoch, tz);
+  }
+  const offset = Number(event[`TZ_OFFSET_${edge}`]);
+  if (event[`TZ_OFFSET_${edge}`] !== undefined && event[`TZ_OFFSET_${edge}`] !== '' && Number.isFinite(offset)) {
+    return `${wall(y, m, d, h, mi, s)}${formatOffset(Math.round(offset / 60))}`;
+  }
+  // Зона события неизвестна — показываем настенное время без смещения, не выдумываем.
+  return wall(y, m, d, h, mi, s);
 }
 
 const DATE_ONLY_RE = /^(\d{4})-(\d{2})-(\d{2})$/;
@@ -92,9 +201,9 @@ function invalidDate(option: string, raw: string): AppError {
   });
 }
 
-function checkCalendarDay(y: number, m: number, d: number): boolean {
-  const date = new Date(Date.UTC(y, m - 1, d));
-  return date.getUTCFullYear() === y && date.getUTCMonth() === m - 1 && date.getUTCDate() === d;
+function nextDay(y: number, m: number, d: number): [number, number, number] {
+  const next = new Date(Date.UTC(y, m - 1, d + 1));
+  return [next.getUTCFullYear(), next.getUTCMonth() + 1, next.getUTCDate()];
 }
 
 export function parseInputDate(raw: string, edge: 'start' | 'end', option: string, tz: string = machineTimeZone()): string {
@@ -105,7 +214,9 @@ export function parseInputDate(raw: string, edge: 'start' | 'end', option: strin
     if (!checkCalendarDay(y, m, d)) {
       throw invalidDate(option, raw);
     }
-    const epoch = edge === 'start' ? wallTimeToEpoch(y, m, d, 0, 0, 0, tz) : wallTimeToEpoch(y, m, d, 23, 59, 59, tz);
+    // Конец дня — секунда до начала следующего: так в него попадает и
+    // повторившийся час при переходе на зимнее время.
+    const epoch = edge === 'start' ? startOfDay(y, m, d, tz) : startOfDay(...nextDay(y, m, d), tz) - 1000;
     return formatInZone(epoch, tz);
   }
   const local = LOCAL_DATETIME_RE.exec(value);
@@ -114,7 +225,11 @@ export function parseInputDate(raw: string, edge: 'start' | 'end', option: strin
     if (!checkCalendarDay(y, m, d) || h > 23 || mi > 59 || s > 59) {
       throw invalidDate(option, raw);
     }
-    return formatInZone(wallTimeToEpoch(y, m, d, h, mi, s, tz), tz);
+    const epoch = wallTimeToEpoch(y, m, d, h, mi, s, tz);
+    if (epoch === null) {
+      throw invalidDate(option, raw);
+    }
+    return formatInZone(epoch, tz);
   }
   if (ZONED_DATETIME_RE.test(value)) {
     const epoch = Date.parse(value);

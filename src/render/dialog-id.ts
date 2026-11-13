@@ -19,8 +19,10 @@ export function normalizeDialogId(raw: string | number, type?: string): string {
   if (user) {
     return user[1] as string;
   }
-  if (/^\d+$/.test(value)) {
-    return type === undefined || PRIVATE_TYPES.has(type) ? value : `chat${value}`;
+  // Голое число без типа неоднозначно: это может быть и номер чата, и номер
+  // сотрудника — молча читать не тот диалог нельзя.
+  if (/^\d+$/.test(value) && type !== undefined) {
+    return PRIVATE_TYPES.has(type) ? value : `chat${value}`;
   }
   throw new AppError({
     code: 'APP_B24_UNEXPECTED_RESPONSE',

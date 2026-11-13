@@ -38,7 +38,6 @@ export const ALLOWED_V1: ReadonlySet<string> = new Set([
   'disk.file.get',
   'disk.file.search',
   'calendar.event.get',
-  'calendar.event.get.nearest',
   'calendar.event.getbyid',
   'log.blogpost.get',
   'log.blogcomment.get',
@@ -94,6 +93,38 @@ export const FORBIDDEN_WORDS: ReadonlySet<string> = new Set([
   'open',
   'close',
   'pause',
+  'remove',
+  'defer',
+  'renew',
+  'stop',
+  'attach',
+  'archive',
+  'invite',
+  'join',
+  'bind',
+  'register',
+  'save',
+  'command',
+  'writing',
+  'terminate',
+  'favorite',
+]);
+
+// Последнее слово разрешённого метода — только из этого набора. Это главная
+// страховка: пишущие методы Битрикса заканчиваются глаголом действия (add,
+// notify, writing, save…), а не get/list.
+export const READ_LAST_WORDS: ReadonlySet<string> = new Set([
+  'get',
+  'list',
+  'search',
+  'getlist',
+  'getchildren',
+  'getbyid',
+  'thread',
+  'current',
+  'status',
+  'groups',
+  'scope',
 ]);
 
 // Слова имени метода: по точкам, подчёркиваниям и границам camelCase.
@@ -106,15 +137,28 @@ export function splitMethodWords(method: string): string[] {
 }
 
 // Битрикс часто пишет методы слитно строчными (uploadfile, addsubfolder,
-// getexternallink), поэтому слово проверяется по началу — и после «get».
-// По началу, а не по вхождению: «thread» не должен совпасть с «read».
+// getexternallink), поэтому слово проверяется по началу — и после «get», «un»,
+// «dis» (unmute, disapprove). По началу, а не по вхождению: «thread» не должен
+// совпасть с «read».
 function isForbiddenWord(word: string): boolean {
-  const stems = word.startsWith('get') ? [word, word.slice(3)] : [word];
+  const stems = [word];
+  for (const prefix of ['get', 'un', 'dis']) {
+    if (word.startsWith(prefix)) {
+      stems.push(word.slice(prefix.length));
+    }
+  }
   return stems.some((stem) => [...FORBIDDEN_WORDS].some((verb) => stem.startsWith(verb)));
 }
 
 export function isForbiddenName(method: string): boolean {
   return splitMethodWords(method).some(isForbiddenWord);
+}
+
+// Форма метода «только чтение»: последнее слово читающее и нигде нет глагола записи.
+export function isReadOnlyShape(method: string): boolean {
+  const words = splitMethodWords(method);
+  const last = words[words.length - 1];
+  return last !== undefined && READ_LAST_WORDS.has(last) && !isForbiddenName(method);
 }
 
 // Право вебхука, нужное методу. Точные названия прав на портале проверяются

@@ -14,6 +14,7 @@ describe('html', () => {
     expect(out).toContain('Сумма');
     expect(out).not.toContain('<');
     expect(out).not.toContain('color:red');
+    expect(out).not.toContain('Сумма100');
   });
 
   it('обычный текст письма сохраняет строки', () => {

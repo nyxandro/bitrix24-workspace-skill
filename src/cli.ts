@@ -4,9 +4,21 @@
  * Дерево команд — src/cli/program.ts, граница ошибок — src/cli/runtime.ts.
  */
 import { buildProgram } from './cli/program.js';
-import { bootstrapEnv, printErrorAndExit } from './cli/runtime.js';
+import { bootstrapEnv, reportError } from './cli/runtime.js';
 
-bootstrapEnv();
-buildProgram()
-  .parseAsync(process.argv)
-  .catch((err: unknown) => printErrorAndExit(err));
+// Любая непойманная ошибка тоже проходит через вычистку секретов.
+process.on('uncaughtException', (err) => {
+  reportError(err);
+  process.exit(1);
+});
+process.on('unhandledRejection', (err) => {
+  reportError(err);
+  process.exit(1);
+});
+
+async function main(): Promise<void> {
+  bootstrapEnv();
+  await buildProgram().parseAsync(process.argv);
+}
+
+main().catch((err: unknown) => reportError(err));

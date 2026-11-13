@@ -46,12 +46,15 @@ describe('parseWebhook', () => {
   });
 
   it('сообщение об ошибке не содержит сам адрес', () => {
+    let caught: AppError | undefined;
     try {
       parseWebhook('http://example.bitrix24.ru/rest/1/testsecret0000/');
     } catch (err) {
-      expect(String((err as AppError).userMessage)).not.toContain('testsecret0000');
-      expect(JSON.stringify((err as AppError).details ?? null)).not.toContain('testsecret0000');
+      caught = err as AppError;
     }
+    expect(caught).toBeInstanceOf(AppError);
+    expect(String(caught?.userMessage)).not.toContain('testsecret0000');
+    expect(JSON.stringify(caught?.details ?? null)).not.toContain('testsecret0000');
   });
 
   it('property: любой правильный адрес разбирается в свои же части', () => {

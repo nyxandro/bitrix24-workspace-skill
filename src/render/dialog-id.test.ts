@@ -14,8 +14,9 @@ describe('normalizeDialogId (данные Битрикса)', () => {
     expect(normalizeDialogId('5', 'private')).toBe('5');
   });
 
-  it('непонятное — APP_B24_UNEXPECTED_RESPONSE', () => {
-    expect(() => normalizeDialogId('что-то')).toThrowError(expect.objectContaining({ code: 'APP_B24_UNEXPECTED_RESPONSE' }));
+  it('непонятное или голое число без типа — APP_B24_UNEXPECTED_RESPONSE', () => {
+    expect(() => normalizeDialogId('что-то', 'chat')).toThrowError(expect.objectContaining({ code: 'APP_B24_UNEXPECTED_RESPONSE' }));
+    expect(() => normalizeDialogId('222222')).toThrowError(expect.objectContaining({ code: 'APP_B24_UNEXPECTED_RESPONSE' }));
   });
 });
 

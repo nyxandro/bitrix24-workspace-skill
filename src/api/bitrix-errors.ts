@@ -22,17 +22,53 @@ const BAD_REQUEST_CODES = new Set(['ERROR_ARGUMENT', 'WRONG_ARGUMENTS', 'INVALID
 
 function resetTime(epochSeconds: number | undefined): string {
   if (epochSeconds === undefined || !Number.isFinite(epochSeconds)) {
-    return 'нескольких минут';
+    return 'через несколько минут';
   }
   const d = new Date(epochSeconds * 1000);
-  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+  return `после ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+}
+
+function isBadRequestCode(upper: string): boolean {
+  return (
+    BAD_REQUEST_CODES.has(upper) ||
+    upper.startsWith('INVALID_') ||
+    upper.endsWith('_EMPTY') ||
+    upper.endsWith('_STRING') ||
+    upper.includes('VALIDATION') ||
+    upper.includes('INVALIDJSON') ||
+    upper.includes('UNKNOWNDTOPROPERTY') ||
+    upper.includes('UNKNOWNFILTEROPERATOR')
+  );
 }
 
 export function mapBitrixError(input: BitrixErrorInput): AppError {
-  const upper = input.code.toUpperCase();
+  const upper = input.code.trim().toUpperCase();
+  const description = input.description ?? '';
   const details = { bitrixCode: input.code, status: input.status, method: input.method, description: input.description };
   const make = (code: string, userMessage: string) => new AppError({ code, userMessage, details });
 
+  const accessDenied = () =>
+    make('APP_B24_ACCESS_DENIED', 'Нет доступа: вы не участник этого чата или у вас нет прав на этот объект в Битрикс24.');
+  const notFound = () => make('APP_B24_NOT_FOUND', 'Не найдено: такого объекта нет или он удалён. Проверьте номер.');
+  const badRequest = () => {
+    const fields = input.fields && input.fields.length > 0 ? `: ${input.fields.join(', ')}` : '';
+    return make('APP_B24_BAD_REQUEST', `Битрикс24 отклонил параметры запроса${fields}. Исправьте параметры команды.`);
+  };
+
+  // Системные ограничения проверяются раньше общего правила «401 — авторизация»:
+  // OVERLOAD_LIMIT тоже приходит со статусом 401 (system-errors.md).
+  if (upper === 'OVERLOAD_LIMIT') {
+    return make('APP_B24_BLOCKED', 'Битрикс24 заблокировал запросы к порталу. Повторять бесполезно — обратитесь в поддержку Битрикс24.');
+  }
+  if (upper === 'QUERY_LIMIT_EXCEEDED') {
+    return make('APP_B24_RATE_LIMITED', 'Битрикс24 временно ограничил частоту запросов. Повторите через несколько секунд.');
+  }
+  if (upper === 'OPERATION_TIME_LIMIT') {
+    return make(
+      'APP_B24_METHOD_TIME_LIMIT',
+      `Битрикс24 временно ограничил этот раздел из-за объёма запросов. Повторите ${resetTime(input.operatingResetAt)}.`,
+    );
+  }
   if (upper === 'ACCESS_DENIED' && input.status === 401) {
     return make(
       'APP_B24_REST_UNAVAILABLE',
@@ -59,34 +95,31 @@ export function mapBitrixError(input: BitrixErrorInput): AppError {
       'Метод Битрикс24 недоступен: у вебхука нет нужного права или портал не поддерживает этот раздел. Проверьте права вебхука командой status.',
     );
   }
-  if (upper === 'QUERY_LIMIT_EXCEEDED') {
-    return make('APP_B24_RATE_LIMITED', 'Битрикс24 временно ограничил частоту запросов. Повторите через несколько секунд.');
-  }
-  if (upper === 'OPERATION_TIME_LIMIT') {
-    return make(
-      'APP_B24_METHOD_TIME_LIMIT',
-      `Битрикс24 временно ограничил этот раздел из-за объёма запросов. Повторите после ${resetTime(input.operatingResetAt)}.`,
-    );
-  }
-  if (upper === 'OVERLOAD_LIMIT') {
-    return make('APP_B24_BLOCKED', 'Битрикс24 заблокировал запросы к порталу. Повторять бесполезно — обратитесь в поддержку Битрикс24.');
-  }
   if (upper.includes('ACCESS_DENIED') || upper === 'ACCESS_ERROR' || upper.includes('ACCESSDENIED')) {
-    return make('APP_B24_ACCESS_DENIED', 'Нет доступа: вы не участник этого чата или у вас нет прав на этот объект в Битрикс24.');
+    return accessDenied();
   }
   if (upper.includes('NOT_FOUND') || upper.includes('NOTFOUND')) {
-    return make('APP_B24_NOT_FOUND', 'Не найдено: такого объекта нет или он удалён. Проверьте номер.');
+    return notFound();
   }
-  if (
-    BAD_REQUEST_CODES.has(upper) ||
-    upper.startsWith('INVALID_') ||
-    upper.includes('VALIDATION') ||
-    upper.includes('INVALIDJSON') ||
-    upper.includes('UNKNOWNDTOPROPERTY') ||
-    upper.includes('UNKNOWNFILTEROPERATOR')
-  ) {
-    const fields = input.fields && input.fields.length > 0 ? `: ${input.fields.join(', ')}` : '';
-    return make('APP_B24_BAD_REQUEST', `Битрикс24 отклонил параметры запроса${fields}. Исправьте параметры команды.`);
+  if (isBadRequestCode(upper)) {
+    return badRequest();
+  }
+  // Код пустой, числовой или незнакомый: ошибка метода, повтор даст то же самое
+  // (error-codes.md). Решаем по тексту и HTTP-статусу.
+  if (/not\s*found|не\s*найден/i.test(description)) {
+    return notFound();
+  }
+  if (/access\s*denied|нет\s*доступа|доступ\s*запрещ/i.test(description)) {
+    return accessDenied();
+  }
+  if (input.status === 403) {
+    return accessDenied();
+  }
+  if (input.status === 404) {
+    return notFound();
+  }
+  if (input.status === 400) {
+    return badRequest();
   }
   return make('APP_B24_PORTAL_ERROR', 'Битрикс24 вернул ошибку при выполнении запроса. Повторите позже.');
 }

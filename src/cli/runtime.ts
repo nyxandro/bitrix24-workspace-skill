@@ -1,24 +1,42 @@
 /**
  * Каркас исполнения CLI: окружение, граница ошибок и общие парсеры.
  *
- * - bootstrapEnv(path) — загрузка .env только из своего пути (не из текущей
- *   папки); настоящие переменные окружения главнее файла;
+ * - bootstrapEnv(path) — адрес вебхука из своего файла .env (не из текущей
+ *   папки); переменная окружения главнее файла; другие строки файла не трогаем;
  * - loadWebhook(env) — адрес вебхука из окружения, fail-fast;
+ * - secretsFromEnv(env) — что вычищать из любого вывода: адрес и код;
  * - formatError(err, secrets, debug) — строки для stderr: русский текст и код,
  *   детали только в отладке, всё через redact();
- * - printErrorAndExit(err, secrets) — единая граница ошибок;
+ * - reportError(err) — единая граница ошибок: печать и код выхода 1;
  * - parsePositiveInt(raw, optionName, max?) — строгая десятичная проверка чисел.
  */
 import dotenv from 'dotenv';
 import fs from 'node:fs';
 import { AppError } from '../api/errors.js';
 import { redact } from '../api/redact.js';
-import { DEBUG_ENV, ENV_PATH, WEBHOOK_ENV } from '../config/config.js';
+import { DEBUG_ENV, ENV_PATH, ENV_PATH_DISPLAY, WEBHOOK_ENV } from '../config/config.js';
 import { parseWebhook, type Webhook } from '../config/webhook.js';
 
-export function bootstrapEnv(envPath: string = ENV_PATH): void {
-  if (fs.existsSync(envPath)) {
-    dotenv.config({ path: envPath, quiet: true });
+// Разбираем файл сами (dotenv.parse), а не dotenv.config: config умеет печатать
+// служебные строки в stdout и переключаться в другие режимы по переменным
+// окружения — а в stdout у нас только JSON.
+export function bootstrapEnv(envPath: string = ENV_PATH, env: NodeJS.ProcessEnv = process.env): void {
+  let content: string;
+  try {
+    content = fs.readFileSync(envPath, 'utf8');
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code === 'ENOENT') {
+      return;
+    }
+    throw new AppError({
+      code: 'APP_B24_CONFIG_UNREADABLE',
+      userMessage: `Не удалось прочитать файл настроек ${ENV_PATH_DISPLAY}: проверьте, что это файл и у вас есть права на чтение.`,
+      cause: err,
+    });
+  }
+  const value = dotenv.parse(content)[WEBHOOK_ENV];
+  if (value !== undefined && !env[WEBHOOK_ENV]) {
+    env[WEBHOOK_ENV] = value;
   }
 }
 
@@ -26,8 +44,8 @@ export function loadWebhook(env: NodeJS.ProcessEnv = process.env): Webhook {
   return parseWebhook(env[WEBHOOK_ENV]);
 }
 
-// Секреты для вычистки: код и полный адрес, если адрес вообще задан (даже
-// неверный — его кусок мог попасть в текст ошибки).
+// Секреты для вычистки: адрес целиком и код, если адрес задан (даже неверный —
+// его кусок мог попасть в текст ошибки).
 export function secretsFromEnv(env: NodeJS.ProcessEnv = process.env): string[] {
   const raw = env[WEBHOOK_ENV]?.trim();
   if (!raw) {
@@ -42,12 +60,28 @@ export function secretsFromEnv(env: NodeJS.ProcessEnv = process.env): string[] {
   return secrets;
 }
 
-function describeDetails(err: unknown): string {
-  if (err instanceof AppError) {
-    const cause = err.cause instanceof Error ? `${err.cause.name}: ${err.cause.message}` : err.cause;
-    return `Детали: ${JSON.stringify({ details: err.details ?? null, cause: cause ?? null })}`;
+export function isDebug(env: NodeJS.ProcessEnv = process.env): boolean {
+  return ['1', 'true', 'yes', 'on'].includes((env[DEBUG_ENV] ?? '').trim().toLowerCase());
+}
+
+const MAX_CAUSE_DEPTH = 4;
+
+// Цепочка причин: для сетевой ошибки «fetch failed» настоящая причина
+// (ENOTFOUND, отказ соединения, сертификат) лежит уровнем-двумя глубже.
+function describeCauses(err: unknown): string[] {
+  const lines: string[] = [];
+  let current: unknown = err instanceof AppError ? err.cause : err;
+  for (let depth = 0; current !== undefined && current !== null && depth < MAX_CAUSE_DEPTH; depth += 1) {
+    if (current instanceof Error) {
+      const code = (current as NodeJS.ErrnoException).code;
+      lines.push(`Причина: ${current.name}: ${current.message}${code ? ` (${code})` : ''}`);
+      current = current.cause;
+    } else {
+      lines.push(`Причина: ${String(current)}`);
+      current = undefined;
+    }
   }
-  return err instanceof Error ? `Детали: ${err.name}: ${err.message}` : `Детали: ${String(err)}`;
+  return lines;
 }
 
 export function formatError(err: unknown, secrets: readonly string[], debug: boolean): string[] {
@@ -56,16 +90,21 @@ export function formatError(err: unknown, secrets: readonly string[], debug: boo
       ? [`Ошибка: ${err.userMessage} [${err.code}]`]
       : [`Ошибка: Непредвиденная ошибка. Запустите с ${DEBUG_ENV}=1, чтобы увидеть подробности. [APP_UNEXPECTED]`];
   if (debug) {
-    lines.push(describeDetails(err));
+    if (err instanceof AppError && err.details !== undefined) {
+      lines.push(`Детали: ${JSON.stringify(err.details)}`);
+    }
+    lines.push(...describeCauses(err));
   }
   return lines.map((line) => redact(line, secrets));
 }
 
-export function printErrorAndExit(err: unknown, secrets: readonly string[] = secretsFromEnv()): never {
-  for (const line of formatError(err, secrets, Boolean(process.env[DEBUG_ENV]))) {
+// Код выхода ставим через exitCode, а не process.exit(): при выводе в канал
+// (pipe) stdout и stderr успевают дописаться.
+export function reportError(err: unknown, secrets: readonly string[] = secretsFromEnv()): void {
+  for (const line of formatError(err, secrets, isDebug())) {
     console.error(line);
   }
-  process.exit(1);
+  process.exitCode = 1;
 }
 
 const DECIMAL_INT_RE = /^\d+$/;

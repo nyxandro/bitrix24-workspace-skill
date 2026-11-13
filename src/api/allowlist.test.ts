@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { ALLOWED_V1, ALLOWED_V3, isForbiddenName, scopeForMethod, splitMethodWords } from './allowlist.js';
+import { ALLOWED_V1, ALLOWED_V3, isForbiddenName, isReadOnlyShape, scopeForMethod, splitMethodWords } from './allowlist.js';
 
 describe('список разрешённых методов', () => {
   it('ни один разрешённый метод не похож на запись', () => {
@@ -28,6 +28,39 @@ describe('список разрешённых методов', () => {
     expect(isForbiddenName(method)).toBe(true);
   });
 
+  it('каждый разрешённый метод заканчивается «читающим» словом', () => {
+    const offenders = [...ALLOWED_V1, ...ALLOWED_V3].filter((m) => !isReadOnlyShape(m));
+    expect(offenders).toEqual([]);
+  });
+
+  it.each([
+    'im.notify',
+    'im.dialog.writing',
+    'im.disk.file.save',
+    'im.message.command',
+    'tasks.task.defer',
+    'tasks.task.renew',
+    'tasks.task.disapprove',
+    'tasks.task.stopwatch',
+    'tasks.task.unmute',
+    'tasks.task.unpin',
+    'tasks.task.favorite.remove',
+    'tasks.task.files.attach',
+    'task.checklistitem.renew',
+    'sonet_group.user.invite',
+    'sonet_group.user.request',
+    'note.document.archive',
+    'mail.message.removecrmactivity',
+    'event.bind',
+    'placement.bind',
+    'imopenlines.session.join',
+    'bizproc.workflow.terminate',
+    'im.message.add',
+    'disk.file.getExternalLink',
+  ])('пишущий метод %s не проходит проверку формы', (method) => {
+    expect(isReadOnlyShape(method)).toBe(false);
+  });
+
   it('проверяет начало слова, а не вхождение: thread — не read', () => {
     expect(isForbiddenName('mail.message.thread')).toBe(false);
     expect(splitMethodWords('disk.file.getExternalLink')).toEqual(['disk', 'file', 'get', 'external', 'link']);
@@ -48,15 +81,33 @@ describe('список разрешённых методов', () => {
 });
 
 describe('выход в сеть', () => {
-  it('глобальный fetch упоминается только в клиенте и в проверке версии', async () => {
+  const NET_MODULES = /from\s+['"](?:node:)?(?:http|https|net|tls|dgram|child_process)['"]|from\s+['"]undici['"]|require\(\s*['"](?:node:)?(?:http|https|net|tls|child_process|undici)['"]\s*\)/;
+  const FETCH_USE = /(?<![.\w])fetch\b|globalThis\s*\.\s*fetch\b/;
+
+  function stripComments(code: string): string {
+    return code.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`])\/\/.*$/gm, '$1');
+  }
+
+  it('глобальный fetch — только в клиенте и в проверке версии; сетевых модулей нет нигде', async () => {
     const fs = await import('node:fs');
     const path = await import('node:path');
     const srcDir = path.resolve(import.meta.dirname, '..');
     const files = (fs.readdirSync(srcDir, { recursive: true }) as string[])
       .filter((f) => f.endsWith('.ts') && !f.endsWith('.test.ts'))
       .map((f) => f.split(path.sep).join('/'));
-    const users = files.filter((f) => /(?<![.\w])fetch\b/.test(fs.readFileSync(path.join(srcDir, f), 'utf8')));
-    expect(users.every((f) => f === 'api/client.ts' || f === 'commands/update-check.ts')).toBe(true);
-    expect(users).toContain('api/client.ts');
+    const code = new Map(files.map((f) => [f, stripComments(fs.readFileSync(path.join(srcDir, f), 'utf8'))]));
+    const fetchUsers = files.filter((f) => FETCH_USE.test(code.get(f) ?? ''));
+    expect(fetchUsers.every((f) => f === 'api/client.ts' || f === 'commands/update-check.ts')).toBe(true);
+    expect(fetchUsers).toContain('api/client.ts');
+    expect(files.filter((f) => NET_MODULES.test(code.get(f) ?? ''))).toEqual([]);
+  });
+
+  it('сама проверка ловит обходы', () => {
+    expect(FETCH_USE.test('await globalThis.fetch(url)')).toBe(true);
+    expect(FETCH_USE.test('const f = fetch;')).toBe(true);
+    expect(NET_MODULES.test("import https from 'node:https';")).toBe(true);
+    expect(NET_MODULES.test("import { request } from 'undici';")).toBe(true);
+    expect(NET_MODULES.test("import { execSync } from 'child_process';")).toBe(true);
+    expect(FETCH_USE.test(stripComments('// «fetch failed» в комментарии'))).toBe(false);
   });
 });

@@ -29,12 +29,27 @@ describe('bbToText', () => {
     );
   });
 
+  it('списки и таблицы не склеиваются', () => {
+    expect(bbToText('[LIST][*]первое[*]второе[/LIST]')).toBe('- первое\n- второе');
+    expect(bbToText('[TABLE][TR][TD]Сумма[/TD][TD]100[/TD][/TR][TR][TD]НДС[/TD][TD]20[/TD][/TR][/TABLE]')).toBe('Сумма | 100\nНДС | 20');
+  });
+
+  it('внутри [CODE] ничего не разбирается', () => {
+    expect(bbToText('код: [CODE]arr[i] = [B]x[/B][/CODE]')).toBe('код: arr[i] = [B]x[/B]');
+  });
+
+  it('[TIMESTAMP] → дата в зоне читателя', () => {
+    expect(bbToText('встреча [TIMESTAMP=1789000000 FORMAT=SHORT_TIME_FORMAT]', new Map(), 'Europe/Moscow')).toBe(
+      'встреча 2026-09-10T03:26:40+03:00',
+    );
+  });
+
   it('квадратные скобки в обычном тексте не трогаются', () => {
     expect(bbToText('пункт [1] и [ссылка] и [OK]')).toBe('пункт [1] и [ссылка] и [OK]');
   });
 
   it('property: не падает на любой строке и не оставляет закрывающих тегов из набора', () => {
-    const tag = fc.constantFrom('[B]', '[/B]', '[USER=1]', '[/USER]', '[URL=x]', '[/URL]', '[QUOTE]', '[/QUOTE]', '[br]', '[CODE]', '[/CODE]');
+    const tag = fc.constantFrom('[B]', '[/B]', '[USER=1]', '[/USER]', '[URL=x]', '[/URL]', '[QUOTE]', '[/QUOTE]', '[br]', '[TD]', '[/TD]');
     fc.assert(
       fc.property(fc.array(fc.oneof(fc.string(), tag)), (parts) => {
         const out = bbToText(parts.join(''));
@@ -42,6 +57,23 @@ describe('bbToText', () => {
         expect(out).not.toMatch(/\[\/(B|USER|URL|CODE)\]/i);
       }),
     );
+  });
+});
+
+describe('bbToText: [CODE]', () => {
+  it('property: содержимое [CODE] не меняется', () => {
+    fc.assert(
+      fc.property(
+        fc.string().filter((x) => !/\[\/CODE\]/i.test(x) && !x.endsWith('\n')),
+        (body) => {
+          expect(bbToText(`[CODE]${body}[/CODE]`)).toBe(body);
+        },
+      ),
+    );
+  });
+
+  it('заглушка без пары в обычном тексте не съедает текст', () => {
+    expect(bbToText('a\uE0007\uE000b')).toBe('a\uE0007\uE000b');
   });
 });
 

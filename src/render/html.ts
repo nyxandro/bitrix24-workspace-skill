@@ -16,6 +16,8 @@ export function htmlToText(html: string): string {
     selectors: [
       { selector: 'img', format: 'skip' },
       { selector: 'a', options: { hideLinkHrefIfSameAsText: true } },
+      // По умолчанию таблица — просто блок, и суммы слипаются с подписями.
+      { selector: 'table', format: 'dataTable' },
     ],
   }).trim();
 }

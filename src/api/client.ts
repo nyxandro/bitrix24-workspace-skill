@@ -20,7 +20,7 @@ import {
   USER_AGENT,
 } from '../config/config.js';
 import type { Webhook } from '../config/webhook.js';
-import { ALLOWED_V1, ALLOWED_V3 } from './allowlist.js';
+import { ALLOWED_V1, ALLOWED_V3, isReadOnlyShape } from './allowlist.js';
 import { mapBitrixError } from './bitrix-errors.js';
 import { AppError } from './errors.js';
 
@@ -41,6 +41,10 @@ export interface ClientOptions {
 }
 
 type Json = Record<string, unknown>;
+
+// Пути подписанных ссылок на скачивание (DOWNLOAD_URL из disk.file.get).
+// Расширять только после проверки на живом портале (шаг 0, V5).
+const DOWNLOAD_PATHS: ReadonlySet<string> = new Set(['/rest/download.json']);
 
 function isObject(value: unknown): value is Json {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -93,6 +97,28 @@ function notAllowed(method: string): AppError {
   });
 }
 
+// Перенос готового файла на место без перезаписи существующего. link — атомарно;
+// там, где файловая система не умеет жёсткие ссылки, — копия с запретом перезаписи.
+async function placeWithoutOverwrite(tmpPath: string, destPath: string, fail: (reason: string, cause?: unknown) => AppError) {
+  try {
+    await fs.promises.link(tmpPath, destPath);
+    return;
+  } catch (err) {
+    const code = (err as NodeJS.ErrnoException).code;
+    if (code === 'EEXIST') {
+      throw fail('dest-exists', err);
+    }
+    if (code !== 'EPERM' && code !== 'ENOTSUP' && code !== 'EXDEV' && code !== 'EOPNOTSUPP') {
+      throw fail('io', err);
+    }
+  }
+  try {
+    await fs.promises.copyFile(tmpPath, destPath, fs.constants.COPYFILE_EXCL);
+  } catch (err) {
+    throw fail((err as NodeJS.ErrnoException).code === 'EEXIST' ? 'dest-exists' : 'io', err);
+  }
+}
+
 export class B24Client {
   readonly webhook: Webhook;
   private readonly fetchFn: typeof fetch;
@@ -102,11 +128,15 @@ export class B24Client {
   private readonly idleTimeoutMs: number;
   private readonly minIntervalMs: number;
   private lastRequestAt: number | null = null;
+  // Время сброса лимита по времени метода из последнего успешного ответа:
+  // документация советует ориентироваться на него (error-codes.md).
+  private lastOperatingResetAt: number | undefined;
 
   constructor(options: ClientOptions) {
     this.webhook = options.webhook;
     this.fetchFn = options.fetchFn ?? fetch;
-    this.now = options.now ?? Date.now;
+    // Монотонные часы: перевод системного времени назад не растянет паузу.
+    this.now = options.now ?? (() => performance.now());
     this.sleep = options.sleep ?? ((ms) => new Promise((resolve) => setTimeout(resolve, ms)));
     this.timeoutMs = options.timeoutMs ?? REQUEST_TIMEOUT_MS;
     this.idleTimeoutMs = options.idleTimeoutMs ?? DOWNLOAD_IDLE_TIMEOUT_MS;
@@ -114,18 +144,19 @@ export class B24Client {
   }
 
   async call<T = unknown>(method: string, params: Json = {}): Promise<V1Response<T>> {
-    if (!ALLOWED_V1.has(method)) {
+    if (!ALLOWED_V1.has(method) || !isReadOnlyShape(method)) {
       throw notAllowed(method);
     }
     const { origin, userId, code } = this.webhook;
     const { status, body } = await this.post(`${origin}/rest/${userId}/${code}/${method}.json`, params, method);
-    if (typeof body.error === 'string') {
+    // Поле error бывает пустым или числом — признак ошибки его наличие, а не значение.
+    if ('error' in body && !isObject(body.error)) {
       throw mapBitrixError({
-        code: body.error,
+        code: String(body.error ?? ''),
         status,
         method,
         description: typeof body.error_description === 'string' ? body.error_description : undefined,
-        operatingResetAt: operatingResetAt(body),
+        operatingResetAt: operatingResetAt(body) ?? this.lastOperatingResetAt,
       });
     }
     if (status >= 400 || !('result' in body)) {
@@ -142,24 +173,24 @@ export class B24Client {
   }
 
   async callV3<T = unknown>(method: string, payload: Json = {}): Promise<T> {
-    if (!ALLOWED_V3.has(method)) {
+    if (!ALLOWED_V3.has(method) || !isReadOnlyShape(method)) {
       throw notAllowed(method);
     }
     const { origin, userId, code } = this.webhook;
     const { status, body } = await this.post(`${origin}/rest/api/${userId}/${code}/${method}`, payload, method);
-    if (isObject(body.error) || typeof body.error === 'string') {
+    if ('error' in body) {
       const error = isObject(body.error) ? body.error : { code: body.error, message: body.error_description };
       const validation = Array.isArray(error.validation) ? error.validation : [];
       const fields = validation
         .map((item) => (isObject(item) && typeof item.field === 'string' ? item.field : undefined))
         .filter((field): field is string => field !== undefined);
       throw mapBitrixError({
-        code: typeof error.code === 'string' ? error.code : 'UNKNOWN',
+        code: String(error.code ?? ''),
         status,
         method,
         description: typeof error.message === 'string' ? error.message : undefined,
         fields,
-        operatingResetAt: operatingResetAt(body),
+        operatingResetAt: operatingResetAt(body) ?? this.lastOperatingResetAt,
       });
     }
     if (status >= 400 || !('result' in body)) {
@@ -184,8 +215,14 @@ export class B24Client {
     } catch {
       throw fail('bad-url');
     }
+    // Только подписанная ссылка на скачивание с самого портала. Простые методы
+    // Битрикса можно вызвать и GET-запросом, поэтому любой другой путь —
+    // обход списка разрешённого.
     if (parsed.origin !== this.webhook.origin) {
       throw fail('foreign-host');
+    }
+    if (!DOWNLOAD_PATHS.has(parsed.pathname)) {
+      throw fail('not-a-download-link');
     }
 
     await this.pace();
@@ -217,12 +254,19 @@ export class B24Client {
       } finally {
         clearTimeout(responseTimer);
       }
+      const finalUrl = response.url === '' ? url : response.url;
+      if (new URL(finalUrl).origin !== this.webhook.origin) {
+        void response.body?.cancel().catch(() => undefined);
+        throw fail('redirect-foreign-host');
+      }
       if (response.status !== 200 || !response.body) {
+        void response.body?.cancel().catch(() => undefined);
         throw fail(`status-${response.status}`);
       }
       // Без нужных заголовков сервер отдаёт страницу 404 под именем файла.
       const contentType = response.headers.get('content-type') ?? '';
       if (/text\/html/i.test(contentType) && !/\.html?$/i.test(name)) {
+        void response.body.cancel().catch(() => undefined);
         throw fail('html-instead-of-file');
       }
 
@@ -235,22 +279,27 @@ export class B24Client {
           break;
         }
         bytes += chunk.value.byteLength;
-        if (bytes > maxBytes) {
+        if (bytes > maxBytes || bytes > expectedSize) {
           void reader.cancel().catch(() => undefined);
-          throw fail('over-limit');
+          throw fail(bytes > maxBytes ? 'over-limit' : 'more-than-expected');
         }
         await handle.write(chunk.value);
       }
-      if (bytes !== expectedSize) {
-        throw fail(`size-mismatch-${bytes}-of-${expectedSize}`);
-      }
       await handle.close();
       handle = undefined;
-      await fs.promises.rename(tmpPath, destPath);
-      return { path: destPath, size: bytes };
+      // Сверяем размер записанного файла, а не принятых байт: при нехватке места
+      // на диске файл мог записаться не целиком.
+      const written = (await fs.promises.stat(tmpPath)).size;
+      if (bytes !== expectedSize || written !== expectedSize) {
+        throw fail(`size-mismatch-${written}-of-${expectedSize}`);
+      }
+      await placeWithoutOverwrite(tmpPath, destPath, fail);
+      await fs.promises.rm(tmpPath, { force: true });
+      return { path: destPath, size: written };
     } catch (err) {
       await handle?.close().catch(() => undefined);
-      await fs.promises.rm(tmpPath, { force: true });
+      // Сбой удаления временного файла не должен скрыть исходную ошибку.
+      await fs.promises.rm(tmpPath, { force: true }).catch(() => undefined);
       throw err instanceof AppError ? err : fail('io', err);
     }
   }
@@ -288,11 +337,21 @@ export class B24Client {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'User-Agent': USER_AGENT },
         body: JSON.stringify(payload),
+        redirect: 'manual',
         signal: AbortSignal.timeout(this.timeoutMs),
       });
       text = await response.text();
     } catch (err) {
       throw transportError(err, method);
+    }
+    // Переадресация POST превратилась бы в GET без параметров — не следуем ей.
+    if (response.status >= 300 && response.status < 400) {
+      throw new AppError({
+        code: 'APP_B24_PORTAL_MOVED',
+        userMessage:
+          'Портал Битрикс24 переадресует запросы на другой адрес — возможно, портал переименован. Создайте вебхук заново и замените адрес в файле настроек.',
+        details: { method, status: response.status },
+      });
     }
     let body: unknown;
     try {
@@ -303,16 +362,21 @@ export class B24Client {
     if (!isObject(body)) {
       throw unexpected(method, response.status);
     }
+    const resetAt = operatingResetAt(body);
+    if (resetAt !== undefined && !('error' in body)) {
+      this.lastOperatingResetAt = resetAt;
+    }
     return { status: response.status, body };
   }
 
+  // Слот резервируется синхронно, до ожидания: при параллельных вызовах каждый
+  // следующий встаёт через интервал после предыдущего, а не все сразу.
   private async pace(): Promise<void> {
-    if (this.lastRequestAt !== null) {
-      const wait = this.minIntervalMs - (this.now() - this.lastRequestAt);
-      if (wait > 0) {
-        await this.sleep(wait);
-      }
+    const now = this.now();
+    const start = this.lastRequestAt === null ? now : Math.max(now, this.lastRequestAt + this.minIntervalMs);
+    this.lastRequestAt = start;
+    if (start > now) {
+      await this.sleep(start - now);
     }
-    this.lastRequestAt = this.now();
   }
 }

@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Webhook } from '../config/webhook.js';
 import { B24Client } from './client.js';
 import { AppError } from './errors.js';
@@ -71,6 +71,41 @@ describe('B24Client.call (старая версия REST)', () => {
     expect(await codeOf(client.call('disk.storage.getlist'))).toBe('APP_B24_SCOPE_MISSING');
   });
 
+  it('пустой и числовой код ошибки разбираются по наличию поля error', async () => {
+    const empty = vi.fn(async () => json({ error: '', error_description: 'Not found' }, 400));
+    expect(await codeOf(makeClient(empty as unknown as typeof fetch).client.call('tasks.task.get', { taskId: 1 }))).toBe('APP_B24_NOT_FOUND');
+    const numeric = vi.fn(async () => json({ error: 100, error_description: 'Invalid value' }, 400));
+    expect(await codeOf(makeClient(numeric as unknown as typeof fetch).client.call('tasks.task.get', { taskId: 1 }))).toBe(
+      'APP_B24_BAD_REQUEST',
+    );
+  });
+
+  it('время сброса лимита берётся из последнего успешного ответа, если в ошибке его нет', async () => {
+    const responses = [
+      json({ result: [], time: { operating_reset_at: 1_800_000_000 } }),
+      json({ error: 'OPERATION_TIME_LIMIT', error_description: 'x' }, 429),
+    ];
+    const fetchFn = vi.fn(async () => responses.shift() as Response);
+    const { client } = makeClient(fetchFn as unknown as typeof fetch);
+    await client.call('im.recent.list');
+    try {
+      await client.call('im.recent.list');
+    } catch (err) {
+      expect((err as AppError).userMessage).toMatch(/Повторите после \d{2}:\d{2}\.$/);
+      return;
+    }
+    throw new Error('ожидалась ошибка');
+  });
+
+  it('переадресация портала — APP_B24_PORTAL_MOVED, запрос не повторяется GET-ом', async () => {
+    const fetchFn = vi.fn(async (_url: string, init: RequestInit) => {
+      expect(init.redirect).toBe('manual');
+      return new Response(null, { status: 301, headers: { Location: 'https://new.bitrix24.ru/rest/1/x/im.recent.list.json' } });
+    });
+    const { client } = makeClient(fetchFn as unknown as typeof fetch);
+    expect(await codeOf(client.call('im.recent.list'))).toBe('APP_B24_PORTAL_MOVED');
+  });
+
   it('OPERATION_TIME_LIMIT берёт время сброса из ответа', async () => {
     const fetchFn = vi.fn(async () => json({ error: 'OPERATION_TIME_LIMIT', error_description: 'x', time: { operating_reset_at: 1_800_000_000 } }, 429));
     const { client } = makeClient(fetchFn as unknown as typeof fetch);
@@ -120,6 +155,24 @@ describe('B24Client.call (старая версия REST)', () => {
   });
 });
 
+describe('B24Client: темп при параллельных вызовах', () => {
+  it('четыре одновременных вызова расходятся по 500 мс', async () => {
+    const sleeps: number[] = [];
+    const fetchFn = vi.fn(async () => json({ result: [] }));
+    const client = new B24Client({
+      webhook: WEBHOOK,
+      fetchFn: fetchFn as unknown as typeof fetch,
+      now: () => 0,
+      sleep: async (ms) => {
+        sleeps.push(ms);
+      },
+    });
+    await Promise.all([1, 2, 3, 4].map(() => client.call('im.recent.list')));
+    expect(sleeps.sort((a, b) => a - b)).toEqual([500, 1000, 1500]);
+    expect(fetchFn).toHaveBeenCalledTimes(4);
+  });
+});
+
 describe('B24Client.callV3 (REST 3.0)', () => {
   it('ходит по /rest/api/ и отдаёт result', async () => {
     const fetchFn = vi.fn(async () => json({ result: { items: [{ id: 3 }] }, time: {} }));
@@ -147,7 +200,17 @@ describe('B24Client.callV3 (REST 3.0)', () => {
 });
 
 describe('B24Client.download', () => {
-  const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), 'b24-dl-'));
+  const made: string[] = [];
+  const tmp = () => {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'b24-dl-'));
+    made.push(dir);
+    return dir;
+  };
+  afterEach(() => {
+    for (const dir of made.splice(0)) {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  });
   const LINK = 'https://example.bitrix24.ru/rest/download.json?auth[auth]=filetoken0000&id=5';
 
   function streamOf(chunks: Uint8Array[], hang = false): ReadableStream<Uint8Array> {
@@ -215,6 +278,49 @@ describe('B24Client.download', () => {
     expect(fs.readdirSync(dir)).toEqual([]);
   });
 
+  it.each([
+    ['адрес метода вебхука', 'https://example.bitrix24.ru/rest/1/testsecret0000/im.message.add.json?DIALOG_ID=chat1&MESSAGE=x'],
+    ['адрес REST 3.0', 'https://example.bitrix24.ru/rest/api/1/testsecret0000/mail.message.send'],
+    ['http вместо https', 'http://example.bitrix24.ru/rest/download.json?auth[auth]=filetoken0000'],
+    ['другой путь портала', 'https://example.bitrix24.ru/company/personal/user/1/'],
+  ])('%s — отказ без запроса', async (_name, url) => {
+    const fetchFn = vi.fn();
+    const { client } = makeClient(fetchFn as unknown as typeof fetch);
+    expect(await codeOf(client.download(url, path.join(tmp(), 'x.pdf'), 3, 100))).toBe('APP_B24_DOWNLOAD_FAILED');
+    expect(fetchFn).not.toHaveBeenCalled();
+  });
+
+  it('переадресация на чужой хост — отказ, файла нет', async () => {
+    const dir = tmp();
+    const fetchFn = vi.fn(async () => {
+      const res = new Response(streamOf([new Uint8Array([1, 2, 3])]), { status: 200 });
+      Object.defineProperty(res, 'url', { value: 'https://evil.example.com/file' });
+      return res;
+    });
+    const { client } = makeClient(fetchFn as unknown as typeof fetch);
+    expect(await codeOf(client.download(LINK, path.join(dir, 'x.pdf'), 3, 100))).toBe('APP_B24_DOWNLOAD_FAILED');
+    expect(fs.readdirSync(dir)).toEqual([]);
+  });
+
+  it('существующий файл не перезаписывается', async () => {
+    const dir = tmp();
+    const dest = path.join(dir, 'Договор.pdf');
+    fs.writeFileSync(dest, 'старое');
+    const fetchFn = vi.fn(async () => new Response(streamOf([new Uint8Array([1, 2, 3])]), { status: 200 }));
+    const { client } = makeClient(fetchFn as unknown as typeof fetch);
+    expect(await codeOf(client.download(LINK, dest, 3, 100))).toBe('APP_B24_DOWNLOAD_FAILED');
+    expect(fs.readFileSync(dest, 'utf8')).toBe('старое');
+    expect(fs.readdirSync(dir)).toEqual(['Договор.pdf']);
+  });
+
+  it('байт больше, чем SIZE, — обрыв сразу, файла нет', async () => {
+    const dir = tmp();
+    const fetchFn = vi.fn(async () => new Response(streamOf([new Uint8Array(5)]), { status: 200 }));
+    const { client } = makeClient(fetchFn as unknown as typeof fetch);
+    expect(await codeOf(client.download(LINK, path.join(dir, 'x.bin'), 3, 100))).toBe('APP_B24_DOWNLOAD_FAILED');
+    expect(fs.readdirSync(dir)).toEqual([]);
+  });
+
   it('медленный, но живой поток дольше таймаута ответа не обрывается', async () => {
     const dir = tmp();
     const fetchFn = vi.fn(async (_url: string, init: RequestInit) => {
@@ -245,11 +351,11 @@ describe('B24Client.download', () => {
       throw new TypeError(`fetch failed ${LINK}`);
     });
     const { client } = makeClient(fetchFn as unknown as typeof fetch);
-    try {
-      await client.download(LINK, path.join(tmp(), 'x.pdf'), 3, 100);
-    } catch (err) {
-      const e = err as AppError;
-      expect(`${e.userMessage} ${JSON.stringify(e.details ?? null)}`).not.toContain('filetoken0000');
-    }
+    const err = await client.download(LINK, path.join(tmp(), 'x.pdf'), 3, 100).then(
+      () => undefined,
+      (e: unknown) => e as AppError,
+    );
+    expect(err).toBeInstanceOf(AppError);
+    expect(`${err?.userMessage} ${JSON.stringify(err?.details ?? null)}`).not.toContain('filetoken0000');
   });
 });
