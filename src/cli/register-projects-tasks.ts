@@ -3,6 +3,7 @@
  */
 import type { Command } from 'commander';
 import { projectsGet, projectsList } from '../commands/projects.js';
+import { tasksTime } from '../commands/task-time.js';
 import { tasksGet, tasksList } from '../commands/tasks.js';
 import type { Runner } from './runtime.js';
 
@@ -42,4 +43,12 @@ export function registerProjectsTasks(program: Command, run: Runner): void {
     .argument('<id>', 'номер задачи')
     .option('--full', 'не обрезать описание')
     .action((id: string, opts: { full?: boolean }) => run((ctx) => tasksGet(ctx, id, opts)));
+  tasks
+    .command('time')
+    .description('Учтённое время в задачах: сколько потрачено и что сделано (по умолчанию — мои записи за период)')
+    .option('--from <дата>', 'с даты ГГГГ-ММ-ДД')
+    .option('--to <дата>', 'по дату ГГГГ-ММ-ДД')
+    .option('--by <способ>', 'work — по дню работы (по умолчанию) | entered — по дню внесения записи')
+    .option('--task <id>', 'одна задача: записи всех участников (период тогда необязателен)')
+    .action((opts: { from?: string; to?: string; by?: string; task?: string }) => run((ctx) => tasksTime(ctx, opts)));
 }

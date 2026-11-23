@@ -32,6 +32,7 @@ export const ALLOWED_V1: ReadonlySet<string> = new Set([
   'tasks.task.list',
   'tasks.task.get',
   'task.checklistitem.getlist',
+  'task.elapseditem.getlist',
   'disk.storage.getlist',
   'disk.storage.getchildren',
   'disk.folder.getchildren',

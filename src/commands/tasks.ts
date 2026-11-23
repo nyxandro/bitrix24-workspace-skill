@@ -62,13 +62,13 @@ function invalid(message: string): AppError {
   return new AppError({ code: 'APP_CLI_INVALID_ARGUMENT', userMessage: message });
 }
 
-function person(raw: unknown): { id: number; name: string } | null {
+export function person(raw: unknown): { id: number; name: string } | null {
   if (!isObject(raw)) return null;
   const id = num(raw.id);
   return id === null ? null : { id, name: str(raw.name) };
 }
 
-function statusName(raw: unknown): string {
+export function statusName(raw: unknown): string {
   return STATUS[str(raw)] ?? str(raw);
 }
 

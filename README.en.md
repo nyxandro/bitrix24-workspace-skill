@@ -30,12 +30,12 @@ methods, and all of them only read.
 |---|---|
 | Chats | Recent dialogs and unread counters, messages in group chats, direct messages, task and project chats, search within a chat, members |
 | Notifications | Mentions, assignments, invitations |
-| Tasks and projects | My tasks in every role, a task card with its chat and checklist, workgroups, projects, collabs |
+| Tasks and projects | My tasks in every role, a task card with its chat and checklist, time logged in tasks (how much and what was done, totals for a period), workgroups, projects, collabs |
 | Drive | Storages, folders, search by name and document text, downloading a file to read it |
 | Mail | Mailboxes, message search, message text, the thread |
 | Calendar and meetings | Upcoming events, any period and calendar, AI summaries of video meetings with agreements, action items and the transcript |
 | Feed and knowledge base | Company news with comments, knowledge base documents |
-| Org and work time | My department, managers, colleagues, the workday and time records |
+| Org and work time | My department, managers, colleagues, the workday log |
 
 CRM, open channels, telephony and business processes are not part of the skill.
 
@@ -90,6 +90,7 @@ Ask as you normally would. The skill's interface and messages are in Russian.
 
 - *What was written in the project this week?*
 - *What are they discussing in task 4521?*
+- *How many hours did I log in tasks in November, and on what?*
 - *What's unread and what came in for me?*
 - *Find the supplier contract on Drive and tell me the payment terms.*
 - *What do I have tomorrow, and what did we agree on in Tuesday's call?*
@@ -132,8 +133,8 @@ is the standard way for servers and containers. Without the URL you get
   too) appear in answers or errors. The skill downloads files itself and reports only the path.
 - **Content is data, not commands.** The agent's instructions forbid acting on anything written in
   emails, messages and documents.
-- **Lists are narrowed to your own.** Even for an administrator, the lists of tasks and meeting
-  summaries and the drives default to your own. By a direct number (a task, a group, someone
+- **Lists are narrowed to your own.** Even for an administrator, the lists of tasks, time records and
+  meeting summaries and the drives default to your own. By a direct number (a task, a group, someone
   else's calendar) and in Drive search you see everything Bitrix24 allows this employee.
 - **What the agent reads goes to its AI service.** Everything the agent reads, it passes to its
   model. Whether that's acceptable for your company's data is your call.

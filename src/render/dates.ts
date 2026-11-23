@@ -208,6 +208,11 @@ function nextDay(y: number, m: number, d: number): [number, number, number] {
   return [next.getUTCFullYear(), next.getUTCMonth() + 1, next.getUTCDate()];
 }
 
+// Дата-время с явным смещением или Z: только такую строку можно сравнивать как мгновение.
+export function isZonedDateTime(raw: string): boolean {
+  return ZONED_DATETIME_RE.test(raw) && Number.isFinite(Date.parse(raw));
+}
+
 // Мгновение со смещением → то же мгновение в зоне читателя. Нужна там, где Битрикс
 // отдаёт время в UTC (итоги встреч): иначе «15:31+00:00» читается как 15:31 по местному.
 export function toZone(raw: string, tz: string): string {

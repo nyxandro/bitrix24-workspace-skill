@@ -1,16 +1,16 @@
 ---
 name: bitrix24-workspace
-description: "Read-only access to the user's own Bitrix24 (Битрикс24) workspace through a bundled CLI and an inbound webhook — chats and direct messages, task chats, project and collab chats, notifications, tasks, workgroups/projects/collabs, Drive files (search and download), mail, calendar, AI meeting summaries (CoPilot follow-up), news feed, knowledge base, org structure and work time. Use whenever the user asks what was written or discussed, what is unread, about a task or project, to find or read a file or an email, about meetings, colleagues or company news in Bitrix24 / Битрикс24. Read-only: it cannot send, change or delete anything. Data comes from the live portal via the CLI — never answer from memory."
+description: "Read-only access to the user's own Bitrix24 (Битрикс24) workspace through a bundled CLI and an inbound webhook — chats and direct messages, task chats, project and collab chats, notifications, tasks, workgroups/projects/collabs, Drive files (search and download), mail, calendar, AI meeting summaries (CoPilot follow-up), news feed, knowledge base, org structure, work time and the time logged in tasks (hours spent and what was done). Use whenever the user asks what was written or discussed, what is unread, about a task or project, to find or read a file or an email, about meetings, colleagues or company news, or how many hours were logged in tasks for a period in Bitrix24 / Битрикс24. Read-only: it cannot send, change or delete anything. Data comes from the live portal via the CLI — never answer from memory."
 ---
 
-<!-- bitrix24-workspace · версия 0.1.2 · https://github.com/nyxandro/bitrix24-workspace-skill -->
+<!-- bitrix24-workspace · версия 0.2.0 · https://github.com/nyxandro/bitrix24-workspace-skill -->
 
 # Битрикс24 сотрудника — только чтение
 
 Ты читаешь рабочий Битрикс24 пользователя так, как его видит сам пользователь — владелец
 входящего вебхука: переписку, задачи, проекты, файлы, почту, календарь, итоги встреч,
-ленту, базу знаний, структуру компании и рабочее время. Данные меняются каждую минуту,
-поэтому бери их **только через встроенный CLI** — не по памяти и не из прошлых диалогов.
+ленту, базу знаний, структуру компании, рабочий день и часы, учтённые в задачах. Данные
+меняются каждую минуту, поэтому бери их **только через встроенный CLI** — не по памяти и не из прошлых диалогов.
 
 Скилл **только читает**. Отправить сообщение, изменить задачу, создать файл или ссылку
 он не может технически: в программе зашит список разрешённых методов, и все они читающие.
@@ -67,6 +67,7 @@ node <каталог-скилла>/scripts/b24.cjs <команда> [парам�
 | Проекты, группы, коллабы | `projects list [--search] [--type collab\|project\|group\|scrum] [--mine]`, `projects get <id>` |
 | Мои задачи | `tasks list [--role responsible\|creator\|accomplice\|auditor] [--project id] [--status active\|done\|all] [--search]` |
 | Задача и её обсуждение | `tasks get <id>` → `chats messages <dialogId>` |
+| Часы в задачах: сколько и что сделано | `tasks time --from ГГГГ-ММ-ДД --to ГГГГ-ММ-ДД [--by work\|entered]` — мои записи по задачам с итогами; `tasks time --task <id> [--from --to]` — записи всех участников задачи |
 | Файлы | `disk storages`, `disk ls storage:N\|folder:N`, `disk search <текст>`, `disk file <id>` |
 | Скачать файл, чтобы прочитать | `disk download <id> --out <папка>` |
 | Почта | `mail boxes`, `mail list [--search] [--since] [--unread]`, `mail get <id>`, `mail thread <id>` |
@@ -75,7 +76,7 @@ node <каталог-скилла>/scripts/b24.cjs <команда> [парам�
 | Новости компании | `feed list [--since]`, `feed post <id>` |
 | База знаний | `kb list`, `kb search <текст>`, `kb tree <collectionId>`, `kb doc <id>` |
 | Структура | `org me`, `org find <текст>`, `org department <id>` |
-| Рабочее время | `worktime status`, `worktime records --from --to` |
+| Рабочий день (кнопка «Начать день») | `worktime status`, `worktime records --from --to` — это не часы в задачах |
 
 Даты на входе — `ГГГГ-ММ-ДД` (или `ГГГГ-ММ-ДДTчч:мм`); на выходе — ISO 8601 со смещением.
 
@@ -97,6 +98,12 @@ node <каталог-скилла>/scripts/b24.cjs <команда> [парам�
 - **«Что в задаче N?»** — `tasks get N`: статус, срок, люди, чек-лист; обсуждение —
   `chats messages <dialogId>`; в `linkedDialogs` — другие чаты из описания, их тоже
   можно прочитать.
+- **«Сколько часов я списал за месяц / на что ушло время?»** — `tasks time --from <1-е число>
+  --to <последнее число>`: итог, задачи с итогами и записи — день, время, что сделано.
+  По умолчанию месяц считается по дню работы, который выбирают при внесении. Если человек
+  спрашивает, сколько он внёс или закрыл в этом месяце, в том числе за прошлые месяцы, —
+  `--by entered`. Если неясно, какой счёт нужен, назови оба итога. Журнал рабочего дня
+  (`worktime records`) — другое: он пуст, если человек не нажимает «Начать день».
 - **«Что непрочитанного / что мне прилетело?»** — `chats recent --unread` и
   `notifications`. Непрочитанное — это `unreadCount`, а `markedUnread` — лишь ручная
   пометка пользователя.
@@ -140,6 +147,7 @@ node <каталог-скилла>/scripts/b24.cjs <команда> [парам�
 | `APP_B24_RATE_LIMITED`, `APP_B24_METHOD_TIME_LIMIT` | Подождать (время в тексте) и повторить один раз |
 | `APP_B24_BLOCKED`, `APP_B24_REST_UNAVAILABLE` | Повторять бесполезно — передать текст пользователю |
 | `APP_B24_TIMEOUT`, `APP_B24_NETWORK`, `APP_B24_PORTAL_ERROR` | Повторить позже; при `TIMEOUT` — уменьшить `--limit` |
+| `APP_B24_TOO_MANY_RECORDS` | Записей времени больше 2000 — сделать то, что подсказывает текст ошибки; неполную сумму не называть |
 | `APP_B24_FILE_TOO_LARGE` | Спросить пользователя, качать ли с `--max-mb` |
 | `APP_B24_OUTPUT_DIR_REQUIRED`, `APP_B24_OUTPUT_DIR_INVALID` | Указать существующую папку в `--out` |
 | `APP_B24_SECRET_IN_OUTPUT` | В данных оказался адрес вебхука — сказать пользователю перевыпустить вебхук |

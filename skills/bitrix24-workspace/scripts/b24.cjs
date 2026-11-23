@@ -3810,7 +3810,7 @@ var AppError = class extends Error {
 var import_node_os = __toESM(require("node:os"), 1);
 var import_node_path = __toESM(require("node:path"), 1);
 var APP_NAME = "bitrix24-workspace-skill";
-var APP_VERSION = "0.1.2";
+var APP_VERSION = "0.2.0";
 var CLI_NAME = "b24";
 var CONFIG_DIR = import_node_path.default.join(import_node_os.default.homedir(), ".config", "bitrix24-workspace");
 var ENV_PATH = import_node_path.default.join(CONFIG_DIR, ".env");
@@ -3983,6 +3983,9 @@ function invalidDate(option2, raw) {
 function nextDay(y, m, d) {
   const next = new Date(Date.UTC(y, m - 1, d + 1));
   return [next.getUTCFullYear(), next.getUTCMonth() + 1, next.getUTCDate()];
+}
+function isZonedDateTime(raw) {
+  return ZONED_DATETIME_RE.test(raw) && Number.isFinite(Date.parse(raw));
 }
 function toZone(raw, tz) {
   if (!ZONED_DATETIME_RE.test(raw)) {
@@ -10501,6 +10504,7 @@ var ALLOWED_V1 = /* @__PURE__ */ new Set([
   "tasks.task.list",
   "tasks.task.get",
   "task.checklistitem.getlist",
+  "task.elapseditem.getlist",
   "disk.storage.getlist",
   "disk.storage.getchildren",
   "disk.folder.getchildren",
@@ -12436,6 +12440,23 @@ async function projectsGet(ctx, idRaw) {
   );
 }
 
+// src/render/duration.ts
+var SECONDS_PER_MINUTE = 60;
+var MINUTES_PER_HOUR = 60;
+function formatDuration(seconds) {
+  if (!Number.isSafeInteger(seconds) || seconds < 0) {
+    throw new RangeError(`formatDuration: \u043E\u0436\u0438\u0434\u0430\u044E\u0442\u0441\u044F \u0446\u0435\u043B\u044B\u0435 \u043D\u0435\u043E\u0442\u0440\u0438\u0446\u0430\u0442\u0435\u043B\u044C\u043D\u044B\u0435 \u0441\u0435\u043A\u0443\u043D\u0434\u044B, \u043F\u043E\u043B\u0443\u0447\u0435\u043D\u043E ${seconds}`);
+  }
+  const totalMinutes = Math.round(seconds / SECONDS_PER_MINUTE);
+  if (totalMinutes === 0) {
+    return seconds === 0 ? "0 \u043C\u0438\u043D" : "\u043C\u0435\u043D\u044C\u0448\u0435 \u043C\u0438\u043D\u0443\u0442\u044B";
+  }
+  const hours = Math.floor(totalMinutes / MINUTES_PER_HOUR);
+  const minutes = totalMinutes % MINUTES_PER_HOUR;
+  if (hours === 0) return `${minutes} \u043C\u0438\u043D`;
+  return minutes === 0 ? `${hours} \u0447` : `${hours} \u0447 ${minutes} \u043C\u0438\u043D`;
+}
+
 // src/commands/tasks.ts
 var STATUS2 = {
   "1": "\u043D\u043E\u0432\u0430\u044F",
@@ -12598,6 +12619,221 @@ async function tasksGet(ctx, idRaw, opts) {
   );
 }
 
+// src/commands/task-time.ts
+var METHOD = "task.elapseditem.getlist";
+var SELECT = ["ID", "TASK_ID", "USER_ID", "COMMENT_TEXT", "SECONDS", "SOURCE", "CREATED_DATE", "DATE_START"];
+var PAGE_SIZE = 50;
+var MAX_PAGES2 = 40;
+var MAX_RECORDS = PAGE_SIZE * MAX_PAGES2;
+var TASK_LOOKUP_CHUNK = 50;
+var SOURCE = { "1": "\u043D\u0435 \u0443\u043A\u0430\u0437\u0430\u043D", "2": "\u0432\u0440\u0443\u0447\u043D\u0443\u044E", "3": "\u0430\u0432\u0442\u043E\u043C\u0430\u0442\u0438\u0447\u0435\u0441\u043A\u0438" };
+var BY_VALUES = ["work", "entered"];
+function invalid6(message) {
+  return new AppError({ code: "APP_CLI_INVALID_ARGUMENT", userMessage: message });
+}
+function isBy(value) {
+  return BY_VALUES.includes(value);
+}
+function offsetOf(zoned) {
+  return /(Z|[+-]\d{2}:\d{2})$/.exec(zoned)?.[1] ?? "";
+}
+function parseRecord(raw, tz) {
+  const id = num(raw.ID);
+  const taskId = num(raw.TASK_ID);
+  const authorId = num(raw.USER_ID);
+  const seconds = num(raw.SECONDS);
+  const workDate = str(raw.CREATED_DATE);
+  const entered = str(raw.DATE_START);
+  if (id === null) throw unexpected2(`${METHOD}.ID`);
+  if (taskId === null) throw unexpected2(`${METHOD}.TASK_ID`);
+  if (authorId === null) throw unexpected2(`${METHOD}.USER_ID`);
+  if (seconds === null || !Number.isSafeInteger(seconds) || seconds < 0) throw unexpected2(`${METHOD}.SECONDS`);
+  if (!isZonedDateTime(workDate)) throw unexpected2(`${METHOD}.CREATED_DATE`);
+  if (entered !== "" && !isZonedDateTime(entered)) throw unexpected2(`${METHOD}.DATE_START`);
+  const record = {
+    id,
+    taskId,
+    authorId,
+    seconds,
+    workDate: toZone(workDate, tz),
+    enteredDate: entered === "" ? null : toZone(entered, tz),
+    comment: bbToText(str(raw.COMMENT_TEXT), /* @__PURE__ */ new Map(), tz).trim(),
+    source: SOURCE[str(raw.SOURCE)] ?? str(raw.SOURCE)
+  };
+  return { record, portalOffset: offsetOf(workDate) };
+}
+function checkMatches(record, query) {
+  if (query.authorId !== null && record.authorId !== query.authorId) throw unexpected2(`${METHOD}.FILTER.USER_ID`);
+  if (query.taskId !== null && record.taskId !== query.taskId) throw unexpected2(`${METHOD}.FILTER.TASK_ID`);
+  const work = Date.parse(record.workDate);
+  if (query.workBetween && (work < query.workBetween.fromMs || work > query.workBetween.toMs)) {
+    throw unexpected2(`${METHOD}.FILTER.CREATED_DATE`);
+  }
+}
+async function fetchRecords(ctx, query, tooManyHint) {
+  const records = [];
+  const portalOffsets = /* @__PURE__ */ new Set();
+  let lastId = 0;
+  for (let page = 1; ; page++) {
+    const resp = await ctx.client.call(METHOD, {
+      ORDER: { ID: "asc" },
+      FILTER: { ...query.filter, ">ID": lastId },
+      SELECT,
+      PARAMS: { NAV_PARAMS: { nPageSize: PAGE_SIZE, iNumPage: 1 } }
+    });
+    if (!Array.isArray(resp.result)) throw unexpected2(`${METHOD}.result`);
+    for (const raw of resp.result) {
+      if (!isObject2(raw)) throw unexpected2(`${METHOD}.result[]`);
+      const { record, portalOffset } = parseRecord(raw, ctx.tz);
+      if (record.id <= lastId) throw unexpected2(`${METHOD}.FILTER.ID`);
+      checkMatches(record, query);
+      lastId = record.id;
+      records.push(record);
+      portalOffsets.add(portalOffset);
+    }
+    if (resp.next === void 0) return { records, portalOffsets };
+    if (resp.result.length === 0) throw unexpected2(`${METHOD}.next`);
+    if (page >= MAX_PAGES2) {
+      throw new AppError({
+        code: "APP_B24_TOO_MANY_RECORDS",
+        userMessage: `\u0417\u0430\u043F\u0438\u0441\u0435\u0439 \u0432\u0440\u0435\u043C\u0435\u043D\u0438 \u0431\u043E\u043B\u044C\u0448\u0435 ${MAX_RECORDS} \u2014 \u043D\u0435\u043F\u043E\u043B\u043D\u0443\u044E \u0441\u0443\u043C\u043C\u0443 \u043F\u0440\u043E\u0433\u0440\u0430\u043C\u043C\u0430 \u043D\u0435 \u0441\u0447\u0438\u0442\u0430\u0435\u0442. ${tooManyHint}`
+      });
+    }
+  }
+}
+function sortKey(record, by) {
+  return Date.parse(by === "entered" && record.enteredDate !== null ? record.enteredDate : record.workDate);
+}
+function summarizeByTask(records, by) {
+  const sorted = [...records].sort((a, b) => sortKey(a, by) - sortKey(b, by) || a.id - b.id);
+  const groups = /* @__PURE__ */ new Map();
+  for (const record of sorted) {
+    const group = groups.get(record.taskId) ?? { taskId: record.taskId, seconds: 0, records: [] };
+    group.seconds += record.seconds;
+    group.records.push(record);
+    groups.set(record.taskId, group);
+  }
+  return [...groups.values()];
+}
+async function lookupTasks(ctx, ids) {
+  const infos = /* @__PURE__ */ new Map();
+  for (let i = 0; i < ids.length; i += TASK_LOOKUP_CHUNK) {
+    const resp = await ctx.client.call("tasks.task.list", {
+      filter: { ID: ids.slice(i, i + TASK_LOOKUP_CHUNK) },
+      select: ["ID", "TITLE", "STATUS", "GROUP_ID"]
+    });
+    if (!isObject2(resp.result)) throw unexpected2("tasks.task.list.result");
+    for (const t of asArray(resp.result.tasks).filter(isObject2)) {
+      const id = num(t.id);
+      if (id !== null) infos.set(id, { title: str(t.title), status: statusName(t.status), project: person(t.group) });
+    }
+  }
+  return infos;
+}
+function authorTotals(records, names) {
+  const seconds = /* @__PURE__ */ new Map();
+  for (const r of records) seconds.set(r.authorId, (seconds.get(r.authorId) ?? 0) + r.seconds);
+  return [...seconds.entries()].sort((a, b) => b[1] - a[1] || a[0] - b[0]).map(([id, total]) => ({ id, name: nameOf(names, id), totalSeconds: total, total: formatDuration(total) }));
+}
+async function tasksTime(ctx, opts) {
+  const taskId = opts.task === void 0 ? null : parseId(opts.task, "--task");
+  const hasPeriod = opts.from !== void 0 || opts.to !== void 0;
+  if (hasPeriod && (!opts.from || !opts.to)) {
+    throw invalid6("\u0423\u043A\u0430\u0436\u0438\u0442\u0435 \u043F\u0435\u0440\u0438\u043E\u0434 \u0446\u0435\u043B\u0438\u043A\u043E\u043C: --from \u0413\u0413\u0413\u0413-\u041C\u041C-\u0414\u0414 \u0438 --to \u0413\u0413\u0413\u0413-\u041C\u041C-\u0414\u0414.");
+  }
+  if (!hasPeriod && taskId === null) {
+    throw invalid6("\u0423\u043A\u0430\u0436\u0438\u0442\u0435 \u043F\u0435\u0440\u0438\u043E\u0434 (--from \u0413\u0413\u0413\u0413-\u041C\u041C-\u0414\u0414 \u0438 --to \u0413\u0413\u0413\u0413-\u041C\u041C-\u0414\u0414) \u0438\u043B\u0438 \u0437\u0430\u0434\u0430\u0447\u0443 (--task <\u043D\u043E\u043C\u0435\u0440>).");
+  }
+  if (opts.by !== void 0 && !hasPeriod) {
+    throw invalid6("\u041F\u0430\u0440\u0430\u043C\u0435\u0442\u0440 --by \u0440\u0430\u0431\u043E\u0442\u0430\u0435\u0442 \u0442\u043E\u043B\u044C\u043A\u043E \u0432\u043C\u0435\u0441\u0442\u0435 \u0441 --from \u0438 --to.");
+  }
+  const by = opts.by ?? "work";
+  if (!isBy(by)) {
+    throw invalid6(`\u041F\u0430\u0440\u0430\u043C\u0435\u0442\u0440 --by: \u043E\u0436\u0438\u0434\u0430\u0435\u0442\u0441\u044F work | entered, \u043F\u043E\u043B\u0443\u0447\u0435\u043D\u043E \xAB${by}\xBB.`);
+  }
+  let period = null;
+  if (opts.from && opts.to) {
+    period = { from: parseInputDate(opts.from, "start", "--from", ctx.tz), to: parseInputDate(opts.to, "end", "--to", ctx.tz), by };
+    if (Date.parse(period.from) > Date.parse(period.to)) {
+      throw invalid6("\u041D\u0430\u0447\u0430\u043B\u043E \u043F\u0435\u0440\u0438\u043E\u0434\u0430 (--from) \u043F\u043E\u0437\u0436\u0435 \u0435\u0433\u043E \u043A\u043E\u043D\u0446\u0430 (--to).");
+    }
+  }
+  const query = {
+    filter: taskId === null ? { USER_ID: ctx.webhook.userId } : { TASK_ID: taskId },
+    authorId: taskId === null ? ctx.webhook.userId : null,
+    taskId,
+    workBetween: null
+  };
+  if (period?.by === "work") {
+    query.filter[">=CREATED_DATE"] = period.from;
+    query.filter["<=CREATED_DATE"] = period.to;
+    query.workBetween = { fromMs: Date.parse(period.from), toMs: Date.parse(period.to) };
+  }
+  const tooManyHint = period?.by === "entered" ? "\u041F\u043E \u0434\u043D\u044E \u0432\u043D\u0435\u0441\u0435\u043D\u0438\u044F \u043F\u0440\u043E\u0433\u0440\u0430\u043C\u043C\u0430 \u043F\u0435\u0440\u0435\u0431\u0438\u0440\u0430\u0435\u0442 \u0432\u0441\u0435 \u0437\u0430\u043F\u0438\u0441\u0438 \u2014 \u043F\u043E\u0441\u0447\u0438\u0442\u0430\u0439\u0442\u0435 \u043F\u043E \u0434\u043D\u044E \u0440\u0430\u0431\u043E\u0442\u044B (\u0431\u0435\u0437 --by entered)." : "\u0421\u0443\u0437\u044C\u0442\u0435 \u043F\u0435\u0440\u0438\u043E\u0434: --from \u0438 --to.";
+  const fetched = await fetchRecords(ctx, query, tooManyHint);
+  let records = fetched.records;
+  if (period?.by === "entered") {
+    const [fromMs, toMs] = [Date.parse(period.from), Date.parse(period.to)];
+    records = records.filter((r) => {
+      if (r.enteredDate === null) throw unexpected2(`${METHOD}.DATE_START`);
+      const entered = Date.parse(r.enteredDate);
+      return entered >= fromMs && entered <= toMs;
+    });
+  }
+  const groups = summarizeByTask(records, period?.by ?? "work");
+  const taskIds = taskId === null ? groups.map((g) => g.taskId) : [taskId];
+  const infos = taskIds.length === 0 ? /* @__PURE__ */ new Map() : await lookupTasks(ctx, taskIds);
+  if (taskId !== null && fetched.records.length === 0 && !infos.has(taskId)) {
+    throw notFound();
+  }
+  const names = taskId === null ? null : await lookupNames(ctx, records.map((r) => r.authorId));
+  const totalSeconds = records.reduce((sum, r) => sum + r.seconds, 0);
+  const tasks = groups.map((g) => {
+    const info = infos.get(g.taskId);
+    return {
+      id: g.taskId,
+      title: info?.title ?? null,
+      project: info?.project ?? null,
+      status: info?.status ?? null,
+      totalSeconds: g.seconds,
+      total: formatDuration(g.seconds),
+      records: g.records.map((r) => ({
+        id: r.id,
+        workDate: r.workDate,
+        enteredDate: r.enteredDate,
+        seconds: r.seconds,
+        time: formatDuration(r.seconds),
+        comment: r.comment,
+        source: r.source,
+        ...names ? { author: { id: r.authorId, name: nameOf(names, r.authorId) } } : {}
+      }))
+    };
+  });
+  const notes = [];
+  if (records.length === 0) notes.push(period ? "\u0417\u0430\u043F\u0438\u0441\u0435\u0439 \u0432\u0440\u0435\u043C\u0435\u043D\u0438 \u043D\u0435\u0442 \u0437\u0430 \u044D\u0442\u043E\u0442 \u043F\u0435\u0440\u0438\u043E\u0434." : "\u0417\u0430\u043F\u0438\u0441\u0435\u0439 \u0432\u0440\u0435\u043C\u0435\u043D\u0438 \u0432 \u0437\u0430\u0434\u0430\u0447\u0435 \u043D\u0435\u0442.");
+  const missing = groups.map((g) => g.taskId).filter((id) => !infos.has(id));
+  if (missing.length > 0) {
+    notes.push(`\u0417\u0430\u0434\u0430\u0447\u0438 ${missing.join(", ")} \u043D\u0435 \u043D\u0430\u0439\u0434\u0435\u043D\u044B \u0438\u043B\u0438 \u043D\u0435\u0434\u043E\u0441\u0442\u0443\u043F\u043D\u044B: \u0432\u0440\u0435\u043C\u044F \u043F\u043E \u043D\u0438\u043C \u043F\u043E\u0441\u0447\u0438\u0442\u0430\u043D\u043E, \u043D\u0430\u0437\u0432\u0430\u043D\u0438\u044F \u043D\u0435\u0442.`);
+  }
+  if (period?.by === "work") {
+    notes.push("\u041F\u0435\u0440\u0438\u043E\u0434 \u0441\u0447\u0438\u0442\u0430\u043D \u043F\u043E \u0434\u043D\u044E \u0440\u0430\u0431\u043E\u0442\u044B. \u0427\u0430\u0441\u044B, \u0432\u043D\u0435\u0441\u0451\u043D\u043D\u044B\u0435 \u0432 \u044D\u0442\u043E\u0442 \u043F\u0435\u0440\u0438\u043E\u0434 \u0437\u0430 \u043F\u0440\u043E\u0448\u043B\u044B\u0435 \u0434\u043D\u0438, \u2014 \u0441 --by entered.");
+  }
+  if (period && opts.from && opts.to && !(isZonedDateTime(opts.from) && isZonedDateTime(opts.to))) {
+    const machineOffsets = /* @__PURE__ */ new Set([offsetOf(period.from), offsetOf(period.to)]);
+    const foreign = [...fetched.portalOffsets].filter((o) => !machineOffsets.has(o));
+    if (foreign.length > 0) {
+      notes.push(
+        `\u0413\u0440\u0430\u043D\u0438\u0446\u044B \u043F\u0435\u0440\u0438\u043E\u0434\u0430 \u0438 \u0434\u0430\u0442\u044B \u0432 \u043E\u0442\u0432\u0435\u0442\u0435 \u2014 \u0432 \u043F\u043E\u044F\u0441\u0435 \u044D\u0442\u043E\u0439 \u043C\u0430\u0448\u0438\u043D\u044B (${[...machineOffsets].join(", ")}), \u0430 \u0411\u0438\u0442\u0440\u0438\u043A\u0441 \u0445\u0440\u0430\u043D\u0438\u0442 \u0432\u0440\u0435\u043C\u044F \u0432 ${foreign.join(", ")}: \u0437\u0430\u043F\u0438\u0441\u0438 \u0443 \u0441\u0430\u043C\u043E\u0439 \u0433\u0440\u0430\u043D\u0438\u0446\u044B \u0441\u0443\u0442\u043E\u043A \u043C\u043E\u0433\u0443\u0442 \u043F\u043E\u043F\u0430\u0441\u0442\u044C \u0432 \u0441\u043E\u0441\u0435\u0434\u043D\u0438\u0439 \u043F\u0435\u0440\u0438\u043E\u0434. \u0422\u043E\u0447\u043D\u044B\u0435 \u0433\u0440\u0430\u043D\u0438\u0446\u044B \u2014 \u0441\u043E \u0441\u043C\u0435\u0449\u0435\u043D\u0438\u0435\u043C \u043F\u043E\u0440\u0442\u0430\u043B\u0430: --from ${opts.from.slice(0, 10)}T00:00:00${foreign[0]} --to ${opts.to.slice(0, 10)}T23:59:59${foreign[0]}.`
+      );
+    }
+  }
+  return envelope(
+    { period, totalSeconds, total: formatDuration(totalSeconds), tasks, ...names ? { authors: authorTotals(records, names) } : {} },
+    null,
+    notes
+  );
+}
+
 // src/cli/register-projects-tasks.ts
 function registerProjectsTasks(program2, run) {
   const projects = program2.command("projects").description("\u0413\u0440\u0443\u043F\u043F\u044B, \u043F\u0440\u043E\u0435\u043A\u0442\u044B, \u0441\u043A\u0440\u0430\u043C\u044B, \u043A\u043E\u043B\u043B\u0430\u0431\u044B");
@@ -12608,6 +12844,7 @@ function registerProjectsTasks(program2, run) {
     (opts) => run((ctx) => tasksList(ctx, opts))
   );
   tasks.command("get").description("\u041A\u0430\u0440\u0442\u043E\u0447\u043A\u0430 \u0437\u0430\u0434\u0430\u0447\u0438: dialogId \u0435\u0451 \u0447\u0430\u0442\u0430, \u0447\u0430\u0442\u044B \u0438\u0437 \u043E\u043F\u0438\u0441\u0430\u043D\u0438\u044F, \u0447\u0435\u043A-\u043B\u0438\u0441\u0442").argument("<id>", "\u043D\u043E\u043C\u0435\u0440 \u0437\u0430\u0434\u0430\u0447\u0438").option("--full", "\u043D\u0435 \u043E\u0431\u0440\u0435\u0437\u0430\u0442\u044C \u043E\u043F\u0438\u0441\u0430\u043D\u0438\u0435").action((id, opts) => run((ctx) => tasksGet(ctx, id, opts)));
+  tasks.command("time").description("\u0423\u0447\u0442\u0451\u043D\u043D\u043E\u0435 \u0432\u0440\u0435\u043C\u044F \u0432 \u0437\u0430\u0434\u0430\u0447\u0430\u0445: \u0441\u043A\u043E\u043B\u044C\u043A\u043E \u043F\u043E\u0442\u0440\u0430\u0447\u0435\u043D\u043E \u0438 \u0447\u0442\u043E \u0441\u0434\u0435\u043B\u0430\u043D\u043E (\u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E \u2014 \u043C\u043E\u0438 \u0437\u0430\u043F\u0438\u0441\u0438 \u0437\u0430 \u043F\u0435\u0440\u0438\u043E\u0434)").option("--from <\u0434\u0430\u0442\u0430>", "\u0441 \u0434\u0430\u0442\u044B \u0413\u0413\u0413\u0413-\u041C\u041C-\u0414\u0414").option("--to <\u0434\u0430\u0442\u0430>", "\u043F\u043E \u0434\u0430\u0442\u0443 \u0413\u0413\u0413\u0413-\u041C\u041C-\u0414\u0414").option("--by <\u0441\u043F\u043E\u0441\u043E\u0431>", "work \u2014 \u043F\u043E \u0434\u043D\u044E \u0440\u0430\u0431\u043E\u0442\u044B (\u043F\u043E \u0443\u043C\u043E\u043B\u0447\u0430\u043D\u0438\u044E) | entered \u2014 \u043F\u043E \u0434\u043D\u044E \u0432\u043D\u0435\u0441\u0435\u043D\u0438\u044F \u0437\u0430\u043F\u0438\u0441\u0438").option("--task <id>", "\u043E\u0434\u043D\u0430 \u0437\u0430\u0434\u0430\u0447\u0430: \u0437\u0430\u043F\u0438\u0441\u0438 \u0432\u0441\u0435\u0445 \u0443\u0447\u0430\u0441\u0442\u043D\u0438\u043A\u043E\u0432 (\u043F\u0435\u0440\u0438\u043E\u0434 \u0442\u043E\u0433\u0434\u0430 \u043D\u0435\u043E\u0431\u044F\u0437\u0430\u0442\u0435\u043B\u0435\u043D)").action((opts) => run((ctx) => tasksTime(ctx, opts)));
 }
 
 // src/commands/status.ts

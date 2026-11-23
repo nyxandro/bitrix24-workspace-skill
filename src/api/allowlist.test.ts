@@ -24,6 +24,9 @@ describe('список разрешённых методов', () => {
     'disk.file.markdeleted',
     'disk.file.getexternallink',
     'im.dialog.readall',
+    'task.elapseditem.add',
+    'task.elapseditem.update',
+    'task.elapseditem.delete',
   ])('ловит пишущий метод %s', (method) => {
     expect(isForbiddenName(method)).toBe(true);
   });
@@ -72,11 +75,17 @@ describe('список разрешённых методов', () => {
     expect(unknown).toEqual([]);
   });
 
-  it('почта, база знаний, учёт времени и итоги встреч — только в REST 3.0', () => {
+  it('почта, база знаний, журнал рабочего дня и итоги встреч — только в REST 3.0', () => {
     for (const m of ['mail.message.get', 'note.document.get', 'timeman.record.list', 'call.followup.get']) {
       expect(ALLOWED_V3.has(m)).toBe(true);
       expect(ALLOWED_V1.has(m)).toBe(false);
     }
+  });
+
+  it('учёт времени в задачах — только чтение списка, без проверки и изменения записей', () => {
+    expect(ALLOWED_V1.has('task.elapseditem.getlist')).toBe(true);
+    const others = [...ALLOWED_V1, ...ALLOWED_V3].filter((m) => m.startsWith('task.elapseditem.') && m !== 'task.elapseditem.getlist');
+    expect(others).toEqual([]);
   });
 });
 
